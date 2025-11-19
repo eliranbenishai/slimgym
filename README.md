@@ -62,6 +62,238 @@ console.log(parsed)
 - **Comments** - Lines starting with `#` are ignored
 - **Repeated keys** - Automatically converted to arrays
 
+## Examples
+
+### Basic Configuration
+
+```typescript
+import sg from 'slimgym'
+
+const config = sg.parse(`
+name "My Application"
+version 1.0.0
+enabled true
+port 8080
+`)
+// Result: { name: "My Application", version: 1.0.0, enabled: true, port: 8080 }
+```
+
+### Comments
+
+Comments start with `#` and can appear anywhere:
+
+```typescript
+const config = sg.parse(`
+# Application configuration
+app
+  name "MyApp"
+  # Server settings
+  server
+    host "localhost"
+    port 8080  # HTTP port
+  # Feature flags
+  features
+    beta true
+    # legacy false  # Commented out
+`)
+```
+
+### Arrays
+
+#### Inline Arrays
+
+```typescript
+const config = sg.parse(`
+tags ["frontend", "react", "typescript"]
+numbers [1, 2, 3, 4, 5]
+mixed [true, "string", 42, null]
+`)
+// Result: {
+//   tags: ["frontend", "react", "typescript"],
+//   numbers: [1, 2, 3, 4, 5],
+//   mixed: [true, "string", 42, null]
+// }
+```
+
+#### Multi-line Arrays
+
+```typescript
+const config = sg.parse(`
+dependencies [
+  "react"
+  "react-dom"
+  "typescript"
+]
+# Empty array
+empty []
+`)
+```
+
+#### Arrays with Block Strings
+
+```typescript
+const config = sg.parse(`
+messages [
+  "Short message"
+  """
+    This is a longer
+    multi-line message
+    with multiple paragraphs.
+  """
+  "Another message"
+]
+`)
+```
+
+### Block Strings
+
+Block strings preserve formatting and whitespace:
+
+```typescript
+const config = sg.parse(`
+description """
+  This is a multi-line
+  block string that preserves
+  line breaks and indentation.
+  
+  It can contain "quotes" and 'apostrophes'
+  without escaping.
+"""
+code """
+function hello() {
+  console.log("Hello, World!")
+}
+"""
+`)
+```
+
+### Complex Nested Structures
+
+```typescript
+const config = sg.parse(`
+# Application configuration
+app
+  name "MyApp"
+  version 2.1.0
+  
+  # Database configuration
+  database
+    host "localhost"
+    port 5432
+    credentials
+      username "admin"
+      password "secret"
+    
+  # API endpoints
+  endpoints [
+    "/api/v1/users"
+    "/api/v1/posts"
+    "/api/v1/comments"
+  ]
+  
+  # Feature flags
+  features
+    featureA true
+    featureB false
+    featureC null  # Not yet decided
+`)
+```
+
+### Mixed Types and Dates
+
+```typescript
+const config = sg.parse(`
+# Event configuration
+event
+  name "Conference 2025"
+  startDate 2025-06-15T09:00:00Z
+  endDate 2025-06-17T18:00:00Z
+  attendees 150
+  active true
+  
+  # Schedule items
+  schedule [
+    {
+      time 2025-06-15T09:00:00Z
+      title "Opening Keynote"
+      speaker "Jane Doe"
+    }
+    {
+      time 2025-06-15T14:00:00Z
+      title "Workshop: TypeScript"
+      speaker "John Smith"
+    }
+  ]
+`)
+```
+
+### Repeated Keys (Auto-Arrays)
+
+When the same key appears multiple times, it's automatically converted to an array:
+
+```typescript
+const config = sg.parse(`
+# Multiple items with the same key
+item
+  name "First Item"
+  price 10.99
+item
+  name "Second Item"
+  price 19.99
+item
+  name "Third Item"
+  price 29.99
+`)
+// Result: {
+//   item: [
+//     { name: "First Item", price: 10.99 },
+//     { name: "Second Item", price: 19.99 },
+//     { name: "Third Item", price: 29.99 }
+//   ]
+// }
+```
+
+### Complete Example
+
+```typescript
+import sg from 'slimgym'
+
+const invoice = sg.parse(`
+# Invoice Configuration
+invoice
+  id 1234
+  date 2025-11-19
+  customer
+    name "ACME Corp"
+    contact """
+      Jane Doe
+      +1 555 1234
+      jane@acme.com
+    """
+  
+  # Line items
+  items
+    item
+      sku "WIDGET-1"
+      qty 10
+      price 9.99
+    item
+      sku "WIDGET-2"
+      qty 5
+      price 19.95
+  
+  notes null
+  
+# Additional metadata
+statuses ["pending", "processing", "completed"]
+tags ["urgent", "b2b"]
+`)
+
+console.log(invoice.invoice.customer.name) // "ACME Corp"
+console.log(invoice.invoice.items.item.length) // 2
+console.log(invoice.statuses) // ["pending", "processing", "completed"]
+```
+
 ## API
 
 ### `sg.parse<T extends NodeObject = NodeObject>(input: string): T`
