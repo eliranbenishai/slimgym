@@ -1,0 +1,62 @@
+{
+  "name": "slimgym",
+  "version": "1.0.0",
+  "description": "JSON is too verbose and lacks modern features. YAML is too restrictive. SlimGym isn't.",
+  "main": "dist/parser.js",
+  "types": "dist/parser.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/parser.d.ts",
+      "import": "./dist/parser.js",
+      "require": "./dist/parser.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "prepublishOnly": "pnpm run build"
+  },
+  "packageManager": "pnpm@10.0.0",
+  "keywords": [
+    "config",
+    "parser",
+    "configuration",
+    "yaml",
+    "json",
+    "indentation",
+    "slimgym"
+  ],
+  "author": "",
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eliranbenishai/slimgym.git"
+  },
+  "bugs": {
+    "url": "https://github.com/eliranbenishai/slimgym/issues"
+  },
+  "homepage": "https://github.com/eliranbenishai/slimgym#readme",
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/node": "^24.10.1",
+    "@vitest/ui": "^4.0.0",
+    "eslint": "^9.0.0",
+    "jiti": "^2.6.1",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  }
+}

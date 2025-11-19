@@ -1,0 +1,10 @@
+node_modules/
+*.ts
+!dist/**/*.d.ts
+example.sg
+tsconfig.json
+.gitignore
+*.log
+.DS_Store
+*.tsbuildinfo
+
