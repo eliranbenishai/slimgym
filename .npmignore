@@ -7,4 +7,13 @@ tsconfig.json
 *.log
 .DS_Store
 *.tsbuildinfo
+dist/eslint.config.js
+dist/eslint.config.js.map
+dist/parser.browser.js
+dist/*.map
+index.html
+parser.test.ts
+eslint.config.ts
+vitest.config.ts
+.npmrc
 

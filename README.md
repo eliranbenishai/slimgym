@@ -211,19 +211,9 @@ event
   attendees 150
   active true
   
-  # Schedule items
-  schedule [
-    {
-      time 2025-06-15T09:00:00Z
-      title "Opening Keynote"
-      speaker "Jane Doe"
-    }
-    {
-      time 2025-06-15T14:00:00Z
-      title "Workshop: TypeScript"
-      speaker "John Smith"
-    }
-  ]
+  # Tags and metadata
+  tags ["conference", "tech", "2025"]
+  status "upcoming"
 `)
 ```
 
