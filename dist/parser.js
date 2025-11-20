@@ -208,7 +208,7 @@ const parse = (input) => {
             isBlockStringStart = true;
             const blockLines = [];
             let blockIndent = null;
-            // Process block string content
+            // Process block string content - continue until we find closing backtick
             while (i < lines.length) {
                 const nextRaw = lines[i];
                 // Check for blank lines
@@ -228,24 +228,30 @@ const parse = (input) => {
                 }
                 const nextIndent = nextIndentMatch[0].length;
                 const nextContent = nextRaw.slice(nextIndent).trim();
-                // Check for closing ` marker
+                // Check for closing ` marker - must be at same or less indent than the starting line
                 if (nextContent === '`' && nextIndent <= indent) {
                     processedLineIndices.add(i);
                     i++;
                     break;
                 }
-                // Detect block indent from first content line
-                blockIndent ?? (blockIndent = nextIndent);
-                // If indent is back to original level or less (and not """ and we've seen content), stop
-                if (nextIndent < blockIndent) {
-                    // Don't mark as processed - let outer loop handle it
-                    break;
+                // Detect block indent from first non-blank content line
+                if (blockIndent === null && nextContent.length > 0) {
+                    blockIndent = nextIndent;
                 }
-                // Add content line
-                if (nextIndent >= blockIndent) {
-                    const lineContent = nextRaw.slice(blockIndent);
-                    blockLines.push(lineContent);
+                // Add content line - include all lines until we find the closing backtick
+                if (blockIndent !== null) {
+                    if (nextIndent >= blockIndent) {
+                        // Normal content line with proper indent
+                        const lineContent = nextRaw.slice(blockIndent);
+                        blockLines.push(lineContent);
+                    }
+                    else {
+                        // Indent decreased - still part of block string until we find closing backtick
+                        const lineContent = nextRaw.slice(nextIndent);
+                        blockLines.push(lineContent);
+                    }
                 }
+                // Mark this line as processed - it's part of the block string
                 processedLineIndices.add(i);
                 i++;
             }
