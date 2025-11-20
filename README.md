@@ -32,6 +32,30 @@ pnpm run build
 ```typescript
 import sg from 'slimgym'
 
+interface InvoiceItem {
+  sku: string
+  qty: number
+  price: number
+}
+
+interface Customer {
+  name: string
+  contact: string
+}
+
+interface Invoice {
+  id: number
+  date: Date
+  customer: Customer
+  items: {
+    item: InvoiceItem[]
+  }
+}
+
+interface Config {
+  invoice: Invoice
+}
+
 const config = `
 invoice
   id 1234
@@ -49,7 +73,7 @@ invoice
       price 9.99
 `
 
-const parsed = sg.parse(config)
+const parsed = sg.parse<Config>(config)
 console.log(parsed)
 ```
 
@@ -83,6 +107,8 @@ port 8080
 Comments start with `#` and can appear anywhere:
 
 ```typescript
+import sg from 'slimgym'
+
 const config = sg.parse(`
 # Application configuration
 app
@@ -103,6 +129,8 @@ app
 #### Inline Arrays
 
 ```typescript
+import sg from 'slimgym'
+
 const config = sg.parse(`
 tags ["frontend", "react", "typescript"]
 numbers [1, 2, 3, 4, 5]
@@ -118,6 +146,8 @@ mixed [true, "string", 42, null]
 #### Multi-line Arrays
 
 ```typescript
+import sg from 'slimgym'
+
 const config = sg.parse(`
 dependencies [
   "react"
@@ -132,6 +162,8 @@ empty []
 #### Arrays with Block Strings
 
 ```typescript
+import sg from 'slimgym'
+
 const config = sg.parse(`
 messages [
   "Short message"
@@ -150,6 +182,8 @@ messages [
 Block strings preserve formatting and whitespace:
 
 ```typescript
+import sg from 'slimgym'
+
 const config = sg.parse(`
 description """
   This is a multi-line
@@ -170,7 +204,30 @@ function hello() {
 ### Complex Nested Structures
 
 ```typescript
-const config = sg.parse(`
+import sg from 'slimgym'
+
+interface ComplexConfig {
+  app: {
+    name: string
+    version: string
+    database: {
+      host: string
+      port: number
+      credentials: {
+        username: string
+        password: string
+      }
+    }
+    endpoints: string[]
+    features: {
+      featureA: boolean
+      featureB: boolean
+      featureC: null
+    }
+  }
+}
+
+const config = sg.parse<ComplexConfig>(`
 # Application configuration
 app
   name "MyApp"
@@ -202,6 +259,8 @@ app
 ### Mixed Types and Dates
 
 ```typescript
+import sg from 'slimgym'
+
 const config = sg.parse(`
 # Event configuration
 event
@@ -222,6 +281,8 @@ event
 When the same key appears multiple times, it's automatically converted to an array:
 
 ```typescript
+import sg from 'slimgym'
+
 const config = sg.parse(`
 # Multiple items with the same key
 item
@@ -248,7 +309,34 @@ item
 ```typescript
 import sg from 'slimgym'
 
-const invoice = sg.parse(`
+interface InvoiceItem {
+  sku: string
+  qty: number
+  price: number
+}
+
+interface Customer {
+  name: string
+  contact: string
+}
+
+interface Invoice {
+  id: number
+  date: Date
+  customer: Customer
+  items: {
+    item: InvoiceItem[]
+  }
+  notes: null
+}
+
+interface InvoiceConfig {
+  invoice: Invoice
+  statuses: Array<string | number | Date | null>
+  tags: string[]
+}
+
+const invoice = sg.parse<InvoiceConfig>(`
 # Invoice Configuration
 invoice
   id 1234
@@ -286,7 +374,7 @@ console.log(invoice.statuses) // ["pending", "processing", "completed"]
 
 ## API
 
-### `sg.parse<T extends NodeObject = NodeObject>(input: string): T`
+### `sg.parse<T = any>(input: string): T`
 
 Parses a SlimGym configuration string and returns a JavaScript object. Supports TypeScript generics for type safety.
 
@@ -294,7 +382,7 @@ Parses a SlimGym configuration string and returns a JavaScript object. Supports 
 - `input` (string): The SlimGym configuration string to parse
 
 **Returns:**
-- `T`: A JavaScript object representing the parsed configuration (defaults to `NodeObject`)
+- `T`: A JavaScript object representing the parsed configuration (defaults to `any`)
 
 **Example:**
 

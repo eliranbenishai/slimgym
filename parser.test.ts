@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import sg, { ParseError, type NodeObject } from './parser'
+import sg, { ParseError } from './parser'
 
 describe('parse', () => {
   describe('basic parsing', () => {
@@ -22,7 +22,7 @@ active true
     })
 
     test('parses nested objects', () => {
-      interface NestedConfig extends NodeObject {
+      interface NestedConfig {
         user: {
           name: string
           age: number
@@ -42,7 +42,7 @@ user
     })
 
     test('parses deeply nested objects', () => {
-      interface DeepNestedConfig extends NodeObject {
+      interface DeepNestedConfig {
         a: {
           b: {
             c: {
@@ -220,7 +220,7 @@ code """
 
   describe('arrays', () => {
     test('parses inline arrays', () => {
-      interface ItemsConfig extends NodeObject {
+      interface ItemsConfig {
         items: string[]
       }
       const result = sg.parse<ItemsConfig>('items ["a", "b", "c"]')
@@ -228,7 +228,7 @@ code """
     })
 
     test('parses inline arrays with mixed types', () => {
-      interface MixedArrayConfig extends NodeObject {
+      interface MixedArrayConfig {
         mixed: Array<string | number | boolean | null>
       }
       const result = sg.parse<MixedArrayConfig>('mixed ["string", 123, true, null]')
@@ -236,7 +236,7 @@ code """
     })
 
     test('parses multi-line arrays', () => {
-      interface ItemsConfig extends NodeObject {
+      interface ItemsConfig {
         items: string[]
       }
       const result = sg.parse<ItemsConfig>(`
@@ -250,7 +250,7 @@ items [
     })
 
     test('parses multi-line arrays with trailing commas', () => {
-      interface ItemsConfig extends NodeObject {
+      interface ItemsConfig {
         items: string[]
       }
       const result = sg.parse<ItemsConfig>(`
@@ -264,7 +264,7 @@ items [
     })
 
     test('parses empty arrays', () => {
-      interface EmptyArrayConfig extends NodeObject {
+      interface EmptyArrayConfig {
         empty: string[]
       }
       const result = sg.parse<EmptyArrayConfig>('empty []')
@@ -272,7 +272,7 @@ items [
     })
 
     test('parses arrays with block strings', () => {
-      interface MessagesConfig extends NodeObject {
+      interface MessagesConfig {
         messages: string[]
       }
       const result = sg.parse<MessagesConfig>(`
@@ -293,7 +293,7 @@ messages [
     })
 
     test('parses nested arrays', () => {
-      interface NestedArrayConfig extends NodeObject {
+      interface NestedArrayConfig {
         nested: number[][]
       }
       const result = sg.parse<NestedArrayConfig>('nested [[1, 2], [3, 4]]')
@@ -303,7 +303,7 @@ messages [
 
   describe('repeated keys', () => {
     test('converts repeated keys to arrays', () => {
-      interface RepeatedKeysConfig extends NodeObject {
+      interface RepeatedKeysConfig {
         item: string[]
       }
       const result = sg.parse<RepeatedKeysConfig>(`
@@ -315,7 +315,7 @@ item "third"
     })
 
     test('handles mixed single and repeated keys', () => {
-      interface MixedKeysConfig extends NodeObject {
+      interface MixedKeysConfig {
         single: string
         item: string[]
       }
@@ -331,18 +331,18 @@ item "second"
 
   describe('complex examples', () => {
     test('parses the example.sg file structure', () => {
-      interface InvoiceItem extends NodeObject {
+      interface InvoiceItem {
         sku: string
         qty: number
         price: number
       }
 
-      interface Customer extends NodeObject {
+      interface Customer {
         name: string
         contact: string
       }
 
-      interface Invoice extends NodeObject {
+      interface Invoice {
         id: number
         date: Date
         customer: Customer
@@ -352,7 +352,7 @@ item "second"
         notes: null
       }
 
-      interface ExampleConfig extends NodeObject {
+      interface ExampleConfig {
         invoice: Invoice
         statuses: Array<string | number | Date | null>
         popsicles: Array<string | number>
@@ -451,7 +451,7 @@ items [
     })
 
     test('parses empty array with spaces', () => {
-      interface EmptyItemsConfig extends NodeObject {
+      interface EmptyItemsConfig {
         items: undefined[]
       }
       const result = sg.parse<EmptyItemsConfig>('items [ ]')

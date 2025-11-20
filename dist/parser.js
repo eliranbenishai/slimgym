@@ -12,6 +12,7 @@ class ParseError extends Error {
     }
 }
 exports.ParseError = ParseError;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const parse = (input) => {
     if (typeof input !== 'string') {
         throw new ParseError('Input must be a string');

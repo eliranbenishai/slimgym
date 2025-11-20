@@ -23,7 +23,8 @@ class ParseError extends Error {
   }
 }
 
-const parse = <T extends NodeObject = NodeObject>(input: string): T => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const parse = <T = any>(input: string): T => {
   if (typeof input !== 'string') {
     throw new ParseError('Input must be a string')
   }

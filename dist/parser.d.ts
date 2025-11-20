@@ -10,7 +10,7 @@ declare class ParseError extends Error {
 }
 export { ParseError, type NodeObject, type NodeValue, type Primitive };
 declare const _default: {
-    parse: <T extends NodeObject = NodeObject>(input: string) => T;
+    parse: <T = any>(input: string) => T;
 };
 export default _default;
 //# sourceMappingURL=parser.d.ts.map
