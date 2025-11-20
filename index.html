@@ -271,7 +271,7 @@
         </div>
         <div class="feature">
           <h3>📝 Block Strings</h3>
-          <p>Multi-line strings with <code>"""</code> preserving formatting</p>
+          <p>Multi-line strings with <code>`</code> preserving formatting</p>
         </div>
         <div class="feature">
           <h3>🔢 Type Inference</h3>
@@ -354,19 +354,19 @@ dependencies [
   "typescript"
 ]`,
 
-      block: `description """
+      block: `description \`
   This is a multi-line
   block string that preserves
   line breaks and indentation.
   
   It can contain "quotes" and 'apostrophes'
   without escaping.
-"""
-code """
+\`
+code \`
 function hello() {
   console.log("Hello, World!")
 }
-"""`,
+\``,
 
       complex: `# Invoice Configuration
 invoice
@@ -374,11 +374,11 @@ invoice
   date 2025-11-19
   customer
     name "ACME Corp"
-    contact """
+    contact \`
       Jane Doe
       +1 555 1234
       jane@acme.com
-    """
+    \`
   
   # Line items
   items

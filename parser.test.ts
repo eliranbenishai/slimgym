@@ -179,40 +179,40 @@ backslash "path\\\\to\\\\file"
   describe('block strings', () => {
     test('parses block strings', () => {
       const result = sg.parse(`
-message """
+message \`
   Hello
   World
-"""
+\`
 `)
       expect(result.message).toBe('Hello\nWorld')
     })
 
     test('preserves blank lines in block strings', () => {
       const result = sg.parse(`
-text """
+text \`
   Line 1
 
   Line 2
-"""
+\`
 `)
       expect(result.text).toBe('Line 1\n\nLine 2')
     })
 
     test('handles empty block strings', () => {
       const result = sg.parse(`
-empty """
-"""
+empty \`
+\`
 `)
       expect(result.empty).toBe('')
     })
 
     test('handles block strings with indentation', () => {
       const result = sg.parse(`
-code """
+code \`
     function test() {
       return true
     }
-"""
+\`
 `)
       expect(result.code).toBe('function test() {\n  return true\n}')
     })
@@ -278,10 +278,10 @@ items [
       const result = sg.parse<MessagesConfig>(`
 messages [
   "short"
-  """
+  \`
     This is a
     longer message
-  """
+  \`
   "another"
 ]
 `)
@@ -364,10 +364,10 @@ invoice
   date 2025-11-19
   customer
     name "ACME Corp"
-    contact """
+    contact \`
       Jane Doe
       +1 555 1234
-    """
+    \`
   items
     item
       sku "WIDGET-1"
@@ -382,11 +382,11 @@ statuses ["janky", 123, "jankier", 2025-11-19T22:01:34.567, null]
 popsicles [
     "strawbeer"
     "lemon lime"
-    """
+    \`
         Those damned hellcats are ruining my hairdo!
         My whole "game" has gone "awry".
         I don't know what to do about it...
-    """
+    \`
     123
 ]
 `)
@@ -498,9 +498,9 @@ user-id 123
 
     test('handles very long block strings', () => {
       const longText = 'a'.repeat(1000)
-      const result = sg.parse(`text """
+      const result = sg.parse(`text \`
 ${longText}
-"""`)
+\``)
       expect(result.text).toBe(longText)
     })
 

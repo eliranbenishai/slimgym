@@ -112,8 +112,8 @@ const parse = <T = any>(input: string): T => {
     const indent = indentMatch[0].length
     const content = raw.slice(indent).trim()
 
-    // Skip lines that are just """ (block string closing markers)
-    if (content === '"""') {
+    // Skip lines that are just ` (block string closing markers)
+    if (content === '`') {
       continue
     }
 
@@ -148,8 +148,8 @@ const parse = <T = any>(input: string): T => {
     let rest = ''
     if (afterKey.length > 0) {
       // Check for block string marker first
-      if (afterKey === '"""') {
-        rest = '"""'
+      if (afterKey === '`') {
+        rest = '`'
       } else if (afterKey.startsWith('"') || afterKey.startsWith("'")) {
         // Quoted string - find the closing quote
         const quoteChar = afterKey[0]
@@ -230,7 +230,7 @@ const parse = <T = any>(input: string): T => {
     }
 
     // Block string? (only process if not inside an array - arrays will handle their own block strings)
-    if (rest === '"""') {
+    if (rest === '`') {
       isBlockStringStart = true
       const blockLines: string[] = []
       let blockIndent: number | null = null
@@ -259,8 +259,8 @@ const parse = <T = any>(input: string): T => {
         const nextIndent = nextIndentMatch[0].length
         const nextContent = nextRaw.slice(nextIndent).trim()
 
-        // Check for closing """ marker
-        if (nextContent === '"""' && nextIndent <= indent) {
+        // Check for closing ` marker
+        if (nextContent === '`' && nextIndent <= indent) {
           processedLineIndices.add(i)
           i++
           break
@@ -269,7 +269,7 @@ const parse = <T = any>(input: string): T => {
         // Detect block indent from first content line
         blockIndent ??= nextIndent
 
-        // If indent is back to original level or less (and not """ and we've seen content), stop
+        // If indent is back to original level or less (and not ` and we've seen content), stop
         if (nextIndent < blockIndent) {
           // Don't mark as processed - let outer loop handle it
           break
@@ -343,7 +343,7 @@ const parse = <T = any>(input: string): T => {
         if (rawIndent > arrayIndent) {
           processedLineIndices.add(lineIndex)
           // Check if this is a block string
-          if (rawContent === '"""') {
+          if (rawContent === '`') {
             // Process block string within array
             const blockLines: string[] = []
             let blockIndent: number | null = null
@@ -355,7 +355,7 @@ const parse = <T = any>(input: string): T => {
               if (testMatch) {
                 const testIndent = testMatch[0].length
                 const testContent = testRaw.slice(testIndent).trim()
-                if (testContent === '"""' && testIndent <= rawIndent) {
+                if (testContent === '`' && testIndent <= rawIndent) {
                   break
                 }
                 if (testIndent > rawIndent) {
@@ -366,7 +366,7 @@ const parse = <T = any>(input: string): T => {
             }
             blockIndent = blockIndent ?? rawIndent + 1
             
-            lineIndex++ // Skip the """ line
+            lineIndex++ // Skip the ` line
 
               while (lineIndex < lines.length) {
               const nextRaw = lines[lineIndex]
@@ -379,8 +379,8 @@ const parse = <T = any>(input: string): T => {
               const nextIndent = nextIndentMatch[0].length
               const nextArrayContent = nextRaw.slice(nextIndent).trim()
 
-              // Check if this is the closing """ marker
-              if (nextIndent <= rawIndent && nextArrayContent === '"""') {
+              // Check if this is the closing ` marker
+              if (nextIndent <= rawIndent && nextArrayContent === '`') {
                 processedLineIndices.add(lineIndex)
                 lineIndex++
                 break
@@ -392,7 +392,7 @@ const parse = <T = any>(input: string): T => {
               }
 
               // Add content lines
-              if (nextIndent >= blockIndent && nextArrayContent !== '"""') {
+              if (nextIndent >= blockIndent && nextArrayContent !== '`') {
                 if (/^\s*$/.test(nextRaw)) {
                   blockLines.push('')
                 } else {

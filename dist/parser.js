@@ -95,8 +95,8 @@ const parse = (input) => {
             continue;
         const indent = indentMatch[0].length;
         const content = raw.slice(indent).trim();
-        // Skip lines that are just """ (block string closing markers)
-        if (content === '"""') {
+        // Skip lines that are just ` (block string closing markers)
+        if (content === '`') {
             continue;
         }
         // Validate that line has content after stripping indent
@@ -127,8 +127,8 @@ const parse = (input) => {
         let rest = '';
         if (afterKey.length > 0) {
             // Check for block string marker first
-            if (afterKey === '"""') {
-                rest = '"""';
+            if (afterKey === '`') {
+                rest = '`';
             }
             else if (afterKey.startsWith('"') || afterKey.startsWith("'")) {
                 // Quoted string - find the closing quote
@@ -204,7 +204,7 @@ const parse = (input) => {
             continue;
         }
         // Block string? (only process if not inside an array - arrays will handle their own block strings)
-        if (rest === '"""') {
+        if (rest === '`') {
             isBlockStringStart = true;
             const blockLines = [];
             let blockIndent = null;
@@ -228,8 +228,8 @@ const parse = (input) => {
                 }
                 const nextIndent = nextIndentMatch[0].length;
                 const nextContent = nextRaw.slice(nextIndent).trim();
-                // Check for closing """ marker
-                if (nextContent === '"""' && nextIndent <= indent) {
+                // Check for closing ` marker
+                if (nextContent === '`' && nextIndent <= indent) {
                     processedLineIndices.add(i);
                     i++;
                     break;
@@ -301,7 +301,7 @@ const parse = (input) => {
                 if (rawIndent > arrayIndent) {
                     processedLineIndices.add(lineIndex);
                     // Check if this is a block string
-                    if (rawContent === '"""') {
+                    if (rawContent === '`') {
                         // Process block string within array
                         const blockLines = [];
                         let blockIndent = null;
@@ -314,7 +314,7 @@ const parse = (input) => {
                             if (testMatch) {
                                 const testIndent = testMatch[0].length;
                                 const testContent = testRaw.slice(testIndent).trim();
-                                if (testContent === '"""' && testIndent <= rawIndent) {
+                                if (testContent === '`' && testIndent <= rawIndent) {
                                     break;
                                 }
                                 if (testIndent > rawIndent) {
@@ -324,7 +324,7 @@ const parse = (input) => {
                             }
                         }
                         blockIndent = blockIndent ?? rawIndent + 1;
-                        lineIndex++; // Skip the """ line
+                        lineIndex++; // Skip the ` line
                         while (lineIndex < lines.length) {
                             const nextRaw = lines[lineIndex];
                             const nextIndentMatch = nextRaw.match(/^ */);
@@ -335,8 +335,8 @@ const parse = (input) => {
                             }
                             const nextIndent = nextIndentMatch[0].length;
                             const nextArrayContent = nextRaw.slice(nextIndent).trim();
-                            // Check if this is the closing """ marker
-                            if (nextIndent <= rawIndent && nextArrayContent === '"""') {
+                            // Check if this is the closing ` marker
+                            if (nextIndent <= rawIndent && nextArrayContent === '`') {
                                 processedLineIndices.add(lineIndex);
                                 lineIndex++;
                                 break;
@@ -346,7 +346,7 @@ const parse = (input) => {
                                 break;
                             }
                             // Add content lines
-                            if (nextIndent >= blockIndent && nextArrayContent !== '"""') {
+                            if (nextIndent >= blockIndent && nextArrayContent !== '`') {
                                 if (/^\s*$/.test(nextRaw)) {
                                     blockLines.push('');
                                 }

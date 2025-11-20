@@ -62,10 +62,10 @@ invoice
   date 2025-11-19
   customer
     name "ACME Corp"
-    contact """
+    contact `
       Jane Doe
       +1 555 1234
-    """
+    `
   items
     item
       sku "WIDGET-1"
@@ -80,7 +80,7 @@ console.log(parsed)
 ## Features
 
 - **Indentation-based syntax** - Clean and readable
-- **Block strings** - Multi-line strings with `"""`
+- **Block strings** - Multi-line strings with `` ` ``
 - **Type inference** - Automatically detects numbers, booleans, dates, and null
 - **Arrays** - Support for arrays with mixed types
 - **Comments** - Lines starting with `#` are ignored
@@ -167,11 +167,11 @@ import sg from 'slimgym'
 const config = sg.parse(`
 messages [
   "Short message"
-  """
+  \`
     This is a longer
     multi-line message
     with multiple paragraphs.
-  """
+  \`
   "Another message"
 ]
 `)
@@ -185,19 +185,19 @@ Block strings preserve formatting and whitespace:
 import sg from 'slimgym'
 
 const config = sg.parse(`
-description """
+description \`
   This is a multi-line
   block string that preserves
   line breaks and indentation.
   
   It can contain "quotes" and 'apostrophes'
   without escaping.
-"""
-code """
+\`
+code \`
 function hello() {
   console.log("Hello, World!")
 }
-"""
+\`
 `)
 ```
 
@@ -343,11 +343,11 @@ invoice
   date 2025-11-19
   customer
     name "ACME Corp"
-    contact """
+    contact `
       Jane Doe
       +1 555 1234
       jane@acme.com
-    """
+    `
   
   # Line items
   items
