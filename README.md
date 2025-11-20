@@ -376,13 +376,13 @@ console.log(invoice.statuses) // ["pending", "processing", "completed"]
 
 ### `sg.parse<T = any>(input: string): T`
 
-Parses a SlimGym configuration string and returns a JavaScript object. Supports TypeScript generics for type safety.
+Parses a SlimGym configuration string and returns a JavaScript object with a `toJSON()` method. Supports TypeScript generics for type safety.
 
 **Parameters:**
 - `input` (string): The SlimGym configuration string to parse
 
 **Returns:**
-- `T`: A JavaScript object representing the parsed configuration (defaults to `any`)
+- `T`: A JavaScript object representing the parsed configuration (defaults to `any`). The returned object has a `toJSON()` method that converts Date objects to ISO strings.
 
 **Example:**
 
@@ -411,6 +411,15 @@ const typedResult = sg.parse<UserConfig>(`
 `)
 // TypeScript now knows the structure!
 console.log(typedResult.name) // Type-safe access
+
+// Converting to JSON (Date objects become ISO strings)
+const config = sg.parse(`
+  event "Conference"
+  date 2025-06-15T09:00:00Z
+`)
+console.log(config.date) // Date object
+const json = config.toJSON()
+console.log(json.date) // "2025-06-15T09:00:00.000Z" (string)
 ```
 
 **Exported Types:**

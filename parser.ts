@@ -24,6 +24,65 @@ class ParseError extends Error {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createParsedConfig = <T = any>(data: T): T => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const convertToJSON = (value: any): any => {
+    if (value instanceof Date) {
+      return value.toISOString()
+    }
+    if (Array.isArray(value)) {
+      return value.map(convertToJSON)
+    }
+    if (typeof value === 'object' && value !== null && !(value instanceof Date)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result: any = {}
+      for (const key in value) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+          result[key] = convertToJSON(value[key])
+        }
+      }
+      return result
+    }
+    return value
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const toJSON = (): any => convertToJSON(data)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return new Proxy(data as any, {
+    get: (target, prop) => {
+      if (prop === 'toJSON') {
+        return toJSON
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return
+      return target[prop as keyof typeof target]
+    },
+    has: (target, prop) => {
+      if (prop === 'toJSON') {
+        return true
+      }
+      return prop in target
+    },
+    ownKeys: (target) => {
+      return Object.keys(target)
+    },
+    getOwnPropertyDescriptor: (target, prop) => {
+      if (prop === 'toJSON') {
+        return {
+          enumerable: false,
+          configurable: true,
+          value: toJSON,
+          writable: false,
+        }
+      }
+      return Object.getOwnPropertyDescriptor(target, prop)
+    },
+  }) as T
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const parse = <T = any>(input: string): T => {
   if (typeof input !== 'string') {
     throw new ParseError('Input must be a string')
@@ -430,11 +489,11 @@ const parse = <T = any>(input: string): T => {
     // If value is an object, descend into it
     if (isPlainObject(value)) {
       stack.push({ indent: line.indent, obj: value })
-      }
     }
-
-    return root as T
   }
+
+  return createParsedConfig<T>(root as T)
+}
 
 const parseArrayItems = (token: string, lineNumber?: number, line?: string): string[] => {
   const items: string[] = []

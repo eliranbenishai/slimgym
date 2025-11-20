@@ -13,6 +13,62 @@ class ParseError extends Error {
 }
 exports.ParseError = ParseError;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createParsedConfig = (data) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const convertToJSON = (value) => {
+        if (value instanceof Date) {
+            return value.toISOString();
+        }
+        if (Array.isArray(value)) {
+            return value.map(convertToJSON);
+        }
+        if (typeof value === 'object' && value !== null && !(value instanceof Date)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const result = {};
+            for (const key in value) {
+                if (Object.prototype.hasOwnProperty.call(value, key)) {
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+                    result[key] = convertToJSON(value[key]);
+                }
+            }
+            return result;
+        }
+        return value;
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toJSON = () => convertToJSON(data);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return new Proxy(data, {
+        get: (target, prop) => {
+            if (prop === 'toJSON') {
+                return toJSON;
+            }
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return
+            return target[prop];
+        },
+        has: (target, prop) => {
+            if (prop === 'toJSON') {
+                return true;
+            }
+            return prop in target;
+        },
+        ownKeys: (target) => {
+            return Object.keys(target);
+        },
+        getOwnPropertyDescriptor: (target, prop) => {
+            if (prop === 'toJSON') {
+                return {
+                    enumerable: false,
+                    configurable: true,
+                    value: toJSON,
+                    writable: false,
+                };
+            }
+            return Object.getOwnPropertyDescriptor(target, prop);
+        },
+    });
+};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const parse = (input) => {
     if (typeof input !== 'string') {
         throw new ParseError('Input must be a string');
@@ -388,7 +444,7 @@ const parse = (input) => {
             stack.push({ indent: line.indent, obj: value });
         }
     }
-    return root;
+    return createParsedConfig(root);
 };
 const parseArrayItems = (token, lineNumber, line) => {
     const items = [];

@@ -545,4 +545,55 @@ offset 2025-11-19T10:30:00+05:00
       expect(result.offset).toBeInstanceOf(Date)
     })
   })
+
+  describe('toJSON', () => {
+    test('converts Date objects to ISO strings', () => {
+      const result = sg.parse(`
+date 2025-11-19T10:30:00Z
+`)
+      expect(result.date).toBeInstanceOf(Date)
+      const json = result.toJSON()
+      expect(json.date).toBe('2025-11-19T10:30:00.000Z')
+      expect(typeof json.date).toBe('string')
+    })
+
+    test('converts nested Date objects to ISO strings', () => {
+      const result = sg.parse(`
+event
+  startDate 2025-06-15T09:00:00Z
+  endDate 2025-06-17T18:00:00Z
+`)
+      expect(result.event.startDate).toBeInstanceOf(Date)
+      const json = result.toJSON()
+      expect(json.event.startDate).toBe('2025-06-15T09:00:00.000Z')
+      expect(json.event.endDate).toBe('2025-06-17T18:00:00.000Z')
+    })
+
+    test('converts Date objects in arrays to ISO strings', () => {
+      const result = sg.parse(`
+dates [
+  2025-11-19T10:30:00Z
+  2025-12-25T00:00:00Z
+]
+`)
+      expect(result.dates[0]).toBeInstanceOf(Date)
+      const json = result.toJSON()
+      expect(json.dates[0]).toBe('2025-11-19T10:30:00.000Z')
+      expect(json.dates[1]).toBe('2025-12-25T00:00:00.000Z')
+    })
+
+    test('preserves other types unchanged', () => {
+      const result = sg.parse(`
+name "John"
+age 30
+active true
+tags ["a", "b"]
+`)
+      const json = result.toJSON()
+      expect(json.name).toBe('John')
+      expect(json.age).toBe(30)
+      expect(json.active).toBe(true)
+      expect(json.tags).toEqual(['a', 'b'])
+    })
+  })
 })
