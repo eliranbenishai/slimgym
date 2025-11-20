@@ -29,7 +29,8 @@
     "test": "vitest run",
     "test:ui": "vitest --ui",
     "test:watch": "vitest",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "test:stress": "vitest run parser.stress.test.ts"
   },
   "packageManager": "pnpm@10.0.0",
   "keywords": [

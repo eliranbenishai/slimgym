@@ -92,6 +92,25 @@ const parse = <T = any>(input: string): T => {
   const processed: LineInfo[] = []
   const processedLineIndices = new Set<number>()
 
+  // Optimized helper functions - avoid regex for frequently called operations
+  const isBlankOrComment = (line: string): number => {
+    // Returns: 0 = blank, 1 = comment, -1 = neither
+    if (line.length === 0) return 0
+    let j = 0
+    while (j < line.length && (line[j] === ' ' || line[j] === '\t')) j++
+    if (j >= line.length) return 0
+    if (line[j] === '#') return 1
+    return -1
+  }
+
+  const getIndentFast = (line: string): number => {
+    let indent = 0
+    for (let j = 0; j < line.length && line[j] === ' '; j++) {
+      indent++
+    }
+    return indent
+  }
+
   // First pass: handle logical lines, block strings (outside arrays), and identify array starts
   let i = 0
   while (i < lines.length) {
@@ -99,17 +118,17 @@ const parse = <T = any>(input: string): T => {
     const lineIndex = i
     i++
 
-    if (/^\s*$/.test(raw)) continue // skip blank
-    if (/^\s*#/.test(raw)) continue // skip comment
+    const blankOrComment = isBlankOrComment(raw)
+    if (blankOrComment === 0) continue // skip blank
+    if (blankOrComment === 1) continue // skip comment
 
     // Skip lines already processed (inside block strings or arrays)
     if (processedLineIndices.has(lineIndex)) {
       continue
     }
 
-    const indentMatch = raw.match(/^ */)
-    if (!indentMatch) continue
-    const indent = indentMatch[0].length
+    const indent = getIndentFast(raw)
+    if (indent === raw.length) continue
     const content = raw.slice(indent).trim()
 
     // Skip lines that are just ` (block string closing markers)
@@ -199,18 +218,18 @@ const parse = <T = any>(input: string): T => {
       let arrayLineIndex = i
       while (arrayLineIndex < lines.length) {
         const arrayRaw = lines[arrayLineIndex]
-        if (/^\s*$/.test(arrayRaw) || /^\s*#/.test(arrayRaw)) {
+        const arrayBlankOrComment = isBlankOrComment(arrayRaw)
+        if (arrayBlankOrComment === 0 || arrayBlankOrComment === 1) {
           processedLineIndices.add(arrayLineIndex)
           arrayLineIndex++
           continue
         }
-        const arrayIndentMatch = arrayRaw.match(/^ */)
-        if (!arrayIndentMatch) {
+        const arrayIndent = getIndentFast(arrayRaw)
+        if (arrayIndent === arrayRaw.length) {
           processedLineIndices.add(arrayLineIndex)
           arrayLineIndex++
           continue
         }
-        const arrayIndent = arrayIndentMatch[0].length
         const arrayContent = arrayRaw.slice(arrayIndent).trim()
         
         if (arrayContent === ']' && arrayIndent <= indent) {
@@ -240,7 +259,8 @@ const parse = <T = any>(input: string): T => {
         const nextRaw = lines[i]
         
         // Check for blank lines
-        if (/^\s*$/.test(nextRaw)) {
+        const nextBlankOrComment = isBlankOrComment(nextRaw)
+        if (nextBlankOrComment === 0) {
           if (blockIndent !== null) {
             blockLines.push('')
           }
@@ -248,15 +268,13 @@ const parse = <T = any>(input: string): T => {
           i++
           continue
         }
-
-        const nextIndentMatch = nextRaw.match(/^ */)
-        if (!nextIndentMatch) {
+        
+        const nextIndent = getIndentFast(nextRaw)
+        if (nextIndent === nextRaw.length) {
           processedLineIndices.add(i)
           i++
           continue
         }
-        
-        const nextIndent = nextIndentMatch[0].length
         const nextContent = nextRaw.slice(nextIndent).trim()
 
         // Check for closing ` marker - must be at same or less indent than the starting line
@@ -310,24 +328,19 @@ const parse = <T = any>(input: string): T => {
 
       while (lineIndex < lines.length) {
         const rawLine = lines[lineIndex]
-        if (/^\s*$/.test(rawLine)) {
-          processedLineIndices.add(lineIndex)
-          lineIndex++
-          continue
-        }
-        if (/^\s*#/.test(rawLine)) {
+        const rawBlankOrComment = isBlankOrComment(rawLine)
+        if (rawBlankOrComment === 0 || rawBlankOrComment === 1) {
           processedLineIndices.add(lineIndex)
           lineIndex++
           continue
         }
 
-        const rawIndentMatch = rawLine.match(/^ */)
-        if (!rawIndentMatch) {
+        const rawIndent = getIndentFast(rawLine)
+        if (rawIndent === rawLine.length) {
           processedLineIndices.add(lineIndex)
           lineIndex++
           continue
         }
-        const rawIndent = rawIndentMatch[0].length
         const rawContent = rawLine.slice(rawIndent).trim()
 
         // Check for closing bracket
@@ -354,18 +367,17 @@ const parse = <T = any>(input: string): T => {
             // Detect block indent from the first content line
             for (let j = lineIndex + 1; j < lines.length; j++) {
               const testRaw = lines[j]
-              if (/^\s*$/.test(testRaw)) continue
-              const testMatch = testRaw.match(/^ */)
-              if (testMatch) {
-                const testIndent = testMatch[0].length
-                const testContent = testRaw.slice(testIndent).trim()
-                if (testContent === '`' && testIndent <= rawIndent) {
-                  break
-                }
-                if (testIndent > rawIndent) {
-                  blockIndent = testIndent
-                  break
-                }
+              const testBlankOrComment = isBlankOrComment(testRaw)
+              if (testBlankOrComment === 0) continue
+              const testIndent = getIndentFast(testRaw)
+              if (testIndent === testRaw.length) continue
+              const testContent = testRaw.slice(testIndent).trim()
+              if (testContent === '`' && testIndent <= rawIndent) {
+                break
+              }
+              if (testIndent > rawIndent) {
+                blockIndent = testIndent
+                break
               }
             }
             blockIndent = blockIndent ?? rawIndent + 1
@@ -374,13 +386,12 @@ const parse = <T = any>(input: string): T => {
 
               while (lineIndex < lines.length) {
               const nextRaw = lines[lineIndex]
-              const nextIndentMatch = nextRaw.match(/^ */)
-              if (!nextIndentMatch) {
+              const nextIndent = getIndentFast(nextRaw)
+              if (nextIndent === nextRaw.length) {
                 processedLineIndices.add(lineIndex)
                 lineIndex++
                 continue
               }
-              const nextIndent = nextIndentMatch[0].length
               const nextArrayContent = nextRaw.slice(nextIndent).trim()
 
               // Check if this is the closing ` marker
@@ -391,13 +402,14 @@ const parse = <T = any>(input: string): T => {
               }
 
               // Check if we've reached the end of the block string
-              if (nextIndent <= rawIndent && !/^\s*$/.test(nextRaw)) {
+              const nextBlankOrComment = isBlankOrComment(nextRaw)
+              if (nextIndent <= rawIndent && nextBlankOrComment !== 0) {
                 break
               }
 
               // Add content lines
               if (nextIndent >= blockIndent && nextArrayContent !== '`') {
-                if (/^\s*$/.test(nextRaw)) {
+                if (nextBlankOrComment === 0) {
                   blockLines.push('')
                 } else {
                   blockLines.push(nextRaw.slice(blockIndent))
