@@ -1,6 +1,6 @@
 {
   "name": "slimgym",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "JSON is too verbose and lacks modern features. YAML is too restrictive. SlimGym isn't.",
   "main": "dist/parser.js",
   "types": "dist/parser.d.ts",
