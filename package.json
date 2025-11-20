@@ -21,10 +21,14 @@
     "build": "tsc",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "prepublishOnly": "pnpm run build",
+    "publish": "pnpm run build && pnpm publish",
+    "publish:patch": "pnpm version patch && pnpm run build && pnpm publish",
+    "publish:minor": "pnpm version minor && pnpm run build && pnpm publish",
+    "publish:major": "pnpm version major && pnpm run build && pnpm publish",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage",
-    "prepublishOnly": "pnpm run build"
+    "test:coverage": "vitest --coverage"
   },
   "packageManager": "pnpm@10.0.0",
   "keywords": [
