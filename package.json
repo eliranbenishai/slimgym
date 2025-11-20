@@ -50,7 +50,7 @@
   "bugs": {
     "url": "https://github.com/eliranbenishai/slimgym/issues"
   },
-  "homepage": "https://github.com/eliranbenishai/slimgym#readme",
+  "homepage": "https://slimgym.dev",
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@types/node": "^24.10.1",
