@@ -3,10 +3,10 @@ invoice
   date 2025-11-19
   customer
     name "ACME Corp"
-    contact `
+    contact """
       Jane Doe
       +1 555 1234
-    `
+    """
   items
     item
       sku "WIDGET-1"
@@ -21,10 +21,10 @@ statuses ["janky", 123, "jankier", 2025-11-19T22:01:34.567, null]
 popsicles [
     "strawbeer",
     "lemon lime",
-    `
+    """
         Those damned hellcats are ruining my hairdo!
         My whole "game" has gone "awry".
         I don't know what to do about it...
-    `,
+    """,
     123
 ]

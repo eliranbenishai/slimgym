@@ -64,7 +64,7 @@ describe('parse stress tests', () => {
 
   test('large block strings - 10KB', () => {
     const content = 'x'.repeat(10000)
-    const input = `text \`\n${content}\n\``
+    const input = `text """\n${content}\n"""`
     const time = measureTime(() => {
       const result = sg.parse(input)
       if (result.text.length !== 10000) {
@@ -76,7 +76,7 @@ describe('parse stress tests', () => {
 
   test('multiple block strings - 100 strings', () => {
     const blocks = Array.from({ length: 100 }, (_, i) => 
-      `text${i} \`\nContent for block ${i}\n\``
+      `text${i} """\nContent for block ${i}\n"""`
     ).join('\n')
     const time = measureTime(() => {
       const result = sg.parse(blocks)
@@ -149,7 +149,7 @@ describe('parse stress tests', () => {
 
   test('block strings with quotes - 50 strings', () => {
     const blocks = Array.from({ length: 50 }, (_, i) => 
-      `code${i} \`\nfunction test${i}() {\n  console.log("Hello ${i}")\n  return true\n}\n\``
+      `code${i} """\nfunction test${i}() {\n  console.log("Hello ${i}")\n  return true\n}\n"""`
     ).join('\n')
     const time = measureTime(() => {
       const result = sg.parse(blocks)

@@ -131,8 +131,8 @@ const parse = <T = any>(input: string): T => {
     if (indent === raw.length) continue
     const content = raw.slice(indent).trim()
 
-    // Skip lines that are just ` (block string closing markers)
-    if (content === '`') {
+    // Skip lines that are just """ (block string closing markers)
+    if (content === '"""') {
       continue
     }
 
@@ -167,8 +167,8 @@ const parse = <T = any>(input: string): T => {
     let rest = ''
     if (afterKey.length > 0) {
       // Check for block string marker first
-      if (afterKey === '`') {
-        rest = '`'
+      if (afterKey === '"""') {
+        rest = '"""'
       } else if (afterKey.startsWith('"') || afterKey.startsWith("'")) {
         // Quoted string - find the closing quote
         const quoteChar = afterKey[0]
@@ -249,12 +249,12 @@ const parse = <T = any>(input: string): T => {
     }
 
     // Block string? (only process if not inside an array - arrays will handle their own block strings)
-    if (rest === '`') {
+    if (rest === '"""') {
       isBlockStringStart = true
       const blockLines: string[] = []
       let blockIndent: number | null = null
 
-      // Process block string content - continue until we find closing backtick
+      // Process block string content - continue until we find closing triple quotes
       while (i < lines.length) {
         const nextRaw = lines[i]
         
@@ -277,8 +277,8 @@ const parse = <T = any>(input: string): T => {
         }
         const nextContent = nextRaw.slice(nextIndent).trim()
 
-        // Check for closing ` marker - must be at same or less indent than the starting line
-        if (nextContent === '`' && nextIndent <= indent) {
+        // Check for closing """ marker - must be at same or less indent than the starting line
+        if (nextContent === '"""' && nextIndent <= indent) {
           processedLineIndices.add(i)
           i++
           break
@@ -289,14 +289,14 @@ const parse = <T = any>(input: string): T => {
           blockIndent = nextIndent
         }
 
-        // Add content line - include all lines until we find the closing backtick
+        // Add content line - include all lines until we find the closing triple quotes
         if (blockIndent !== null) {
         if (nextIndent >= blockIndent) {
             // Normal content line with proper indent
             const lineContent = nextRaw.slice(blockIndent)
             blockLines.push(lineContent)
           } else {
-            // Indent decreased - still part of block string until we find closing backtick
+            // Indent decreased - still part of block string until we find closing triple quotes
             const lineContent = nextRaw.slice(nextIndent)
             blockLines.push(lineContent)
           }
@@ -360,7 +360,7 @@ const parse = <T = any>(input: string): T => {
         if (rawIndent > arrayIndent) {
           processedLineIndices.add(lineIndex)
           // Check if this is a block string
-          if (rawContent === '`') {
+          if (rawContent === '"""') {
             // Process block string within array
             const blockLines: string[] = []
             let blockIndent: number | null = null
@@ -372,7 +372,7 @@ const parse = <T = any>(input: string): T => {
               const testIndent = getIndentFast(testRaw)
               if (testIndent === testRaw.length) continue
               const testContent = testRaw.slice(testIndent).trim()
-              if (testContent === '`' && testIndent <= rawIndent) {
+              if (testContent === '"""' && testIndent <= rawIndent) {
                 break
               }
               if (testIndent > rawIndent) {
@@ -382,7 +382,7 @@ const parse = <T = any>(input: string): T => {
             }
             blockIndent = blockIndent ?? rawIndent + 1
             
-            lineIndex++ // Skip the ` line
+            lineIndex++ // Skip the """ line
 
               while (lineIndex < lines.length) {
               const nextRaw = lines[lineIndex]
@@ -394,8 +394,8 @@ const parse = <T = any>(input: string): T => {
               }
               const nextArrayContent = nextRaw.slice(nextIndent).trim()
 
-              // Check if this is the closing ` marker
-              if (nextIndent <= rawIndent && nextArrayContent === '`') {
+              // Check if this is the closing """ marker
+              if (nextIndent <= rawIndent && nextArrayContent === '"""') {
                 processedLineIndices.add(lineIndex)
                 lineIndex++
                 break
@@ -408,7 +408,7 @@ const parse = <T = any>(input: string): T => {
               }
 
               // Add content lines
-              if (nextIndent >= blockIndent && nextArrayContent !== '`') {
+              if (nextIndent >= blockIndent && nextArrayContent !== '"""') {
                 if (nextBlankOrComment === 0) {
                   blockLines.push('')
                 } else {
