@@ -22,7 +22,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "prepublishOnly": "pnpm run build",
-    "publish": "pnpm run build && pnpm publish",
+    "publish:unversioned": "pnpm run build && pnpm publish --no-git-checks",
     "publish:patch": "pnpm version patch && pnpm publish --no-git-checks",
     "publish:minor": "pnpm version minor && pnpm publish --no-git-checks",
     "publish:major": "pnpm version major && pnpm publish --no-git-checks",
