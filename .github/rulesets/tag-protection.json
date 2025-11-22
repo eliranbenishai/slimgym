@@ -1,0 +1,41 @@
+{
+  "name": "Tag Protection",
+  "target": "tag",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/tags/v*"
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "creation",
+      "parameters": {
+        "restrict_creations": true
+      }
+    },
+    {
+      "type": "update",
+      "parameters": {
+        "restrict_updates": true
+      }
+    },
+    {
+      "type": "deletion",
+      "parameters": {
+        "restrict_deletions": true
+      }
+    },
+    {
+      "type": "required_signatures",
+      "parameters": {
+        "required_signatures": false
+      }
+    }
+  ]
+}
+

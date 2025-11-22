@@ -1,0 +1,8 @@
+# Code owners file
+# This file defines who must approve pull requests
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Everything requires approval from the repository owner
+* @eliranbenishai
+
+

@@ -1,0 +1,64 @@
+{
+  "name": "Pull Request Rules",
+  "target": "pull_request",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/heads/**"
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "required_review_thread_resolution",
+      "parameters": {
+        "required_review_thread_resolution": true
+      }
+    },
+    {
+      "type": "required_approving_review_count",
+      "parameters": {
+        "required_approving_review_count": 1,
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": true,
+        "require_last_push_approval": false
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          {
+            "context": "build",
+            "integration_id": null
+          },
+          {
+            "context": "test",
+            "integration_id": null
+          },
+          {
+            "context": "lint",
+            "integration_id": null
+          }
+        ]
+      }
+    },
+    {
+      "type": "required_conversation_resolution",
+      "parameters": {
+        "required_conversation_resolution": true
+      }
+    },
+    {
+      "type": "merge_queue",
+      "parameters": {
+        "merge_queue_enabled_for_maintainers": false
+      }
+    }
+  ]
+}
+
