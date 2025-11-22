@@ -1,27 +1,4 @@
-type Primitive = string | number | boolean | null | undefined | Date
-type NodeValue = Primitive | NodeObject | NodeValue[] | undefined | null
-interface NodeObject {
-  [key: string]: NodeValue
-}
-
-interface LineInfo {
-  indent: number
-  key: string
-  valueToken: string | null
-  isBlockStringStart: boolean
-  isArrayStart: boolean
-  raw: string
-  rawLineIndex: number // Track original line index
-}
-
-class ParseError extends Error {
-  constructor(message: string, public readonly lineNumber?: number, public readonly line?: string) {
-    super(lineNumber !== undefined && line !== undefined
-      ? `${message} at line ${lineNumber + 1}: "${line}"`
-      : message)
-    this.name = 'ParseError'
-  }
-}
+import { ParseError, type NodeObject, type NodeValue, type LineInfo } from './types.js'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const createParsedConfig = <T = any>(data: T): T => {
@@ -83,7 +60,7 @@ const createParsedConfig = <T = any>(data: T): T => {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const parse = <T = any>(input: string): T => {
+export const parse = <T = any>(input: string): T => {
   if (typeof input !== 'string') {
     throw new ParseError('Input must be a string')
   }
@@ -616,10 +593,4 @@ const parseValue = (token: string): NodeValue => {
 
 const isPlainObject = (v: unknown): v is NodeObject => {
   return typeof v === 'object' && v !== null && !Array.isArray(v) && !(v instanceof Date)
-}
-
-export { ParseError, type NodeObject, type NodeValue, type Primitive }
-
-export default {
-  parse,
 }

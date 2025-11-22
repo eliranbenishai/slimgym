@@ -13,28 +13,13 @@
   },
   "rules": [
     {
-      "type": "creation",
-      "parameters": {
-        "restrict_creations": true
-      }
+      "type": "creation"
     },
     {
-      "type": "update",
-      "parameters": {
-        "restrict_updates": true
-      }
+      "type": "update"
     },
     {
-      "type": "deletion",
-      "parameters": {
-        "restrict_deletions": true
-      }
-    },
-    {
-      "type": "required_signatures",
-      "parameters": {
-        "required_signatures": false
-      }
+      "type": "deletion"
     }
   ]
 }

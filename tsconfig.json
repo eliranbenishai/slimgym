@@ -15,7 +15,7 @@
     "moduleResolution": "node",
     "resolveJsonModule": true
   },
-  "include": ["parser.ts"],
+  "include": ["index.ts", "parse.ts", "slimgify.ts", "types.ts"],
   "exclude": ["node_modules", "dist", "example.sg", "eslint.config.ts", "vitest.config.ts", "parser.test.ts"]
 }
 

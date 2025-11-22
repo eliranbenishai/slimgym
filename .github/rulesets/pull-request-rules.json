@@ -2,7 +2,12 @@
   "name": "Pull Request Rules",
   "target": "pull_request",
   "enforcement": "active",
-  "bypass_actors": [],
+  "bypass_actors": [
+    {
+      "actor_type": "User",
+      "actor_id": "eliranbenishai"
+    }
+  ],
   "conditions": {
     "ref_name": {
       "include": [
@@ -13,10 +18,7 @@
   },
   "rules": [
     {
-      "type": "required_review_thread_resolution",
-      "parameters": {
-        "required_review_thread_resolution": true
-      }
+      "type": "required_review_thread_resolution"
     },
     {
       "type": "required_approving_review_count",
@@ -33,31 +35,19 @@
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
           {
-            "context": "build",
-            "integration_id": null
+            "context": "build"
           },
           {
-            "context": "test",
-            "integration_id": null
+            "context": "test"
           },
           {
-            "context": "lint",
-            "integration_id": null
+            "context": "lint"
           }
         ]
       }
     },
     {
-      "type": "required_conversation_resolution",
-      "parameters": {
-        "required_conversation_resolution": true
-      }
-    },
-    {
-      "type": "merge_queue",
-      "parameters": {
-        "merge_queue_enabled_for_maintainers": false
-      }
+      "type": "required_conversation_resolution"
     }
   ]
 }
