@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import sg, { ParseError } from './parser'
+import sg, { ParseError } from './index'
 
 describe('parse', () => {
   describe('basic parsing', () => {
@@ -594,6 +594,238 @@ tags ["a", "b"]
       expect(json.age).toBe(30)
       expect(json.active).toBe(true)
       expect(json.tags).toEqual(['a', 'b'])
+    })
+  })
+})
+
+describe('slimgify', () => {
+  describe('basic serialization', () => {
+    test('serializes simple key-value pairs', () => {
+      const obj = { name: 'John' }
+      const result = sg.slimgify(obj)
+      expect(result).toBe('name "John"')
+    })
+
+    test('serializes multiple key-value pairs', () => {
+      const obj = {
+        name: 'John',
+        age: 30,
+        active: true,
+      }
+      const result = sg.slimgify(obj)
+      expect(result).toContain('name "John"')
+      expect(result).toContain('age 30')
+      expect(result).toContain('active true')
+    })
+
+    test('serializes nested objects', () => {
+      const obj = {
+        user: {
+          name: 'John',
+          age: 30,
+        },
+      }
+      const result = sg.slimgify(obj)
+      expect(result).toContain('user')
+      expect(result).toContain('  name "John"')
+      expect(result).toContain('  age 30')
+    })
+
+    test('handles empty object', () => {
+      const result = sg.slimgify({})
+      expect(result).toBe('')
+    })
+
+    test('handles null and undefined', () => {
+      expect(sg.slimgify(null)).toBe('')
+      expect(sg.slimgify(undefined)).toBe('')
+    })
+  })
+
+  describe('type serialization', () => {
+    test('serializes booleans', () => {
+      const obj = { active: true, inactive: false }
+      const result = sg.slimgify(obj)
+      expect(result).toContain('active true')
+      expect(result).toContain('inactive false')
+    })
+
+    test('serializes numbers', () => {
+      const obj = { integer: 42, float: 3.14, negative: -10 }
+      const result = sg.slimgify(obj)
+      expect(result).toContain('integer 42')
+      expect(result).toContain('float 3.14')
+      expect(result).toContain('negative -10')
+    })
+
+    test('serializes null and undefined values', () => {
+      const obj = { value: null, missing: undefined }
+      const result = sg.slimgify(obj)
+      expect(result).toContain('value null')
+      expect(result).toContain('missing undefined')
+    })
+
+    test('serializes Date objects', () => {
+      const date = new Date('2025-11-19T10:30:00Z')
+      const obj = { date }
+      const result = sg.slimgify(obj)
+      expect(result).toContain('date 2025-11-19T10:30:00.000Z')
+    })
+
+    test('serializes quoted strings', () => {
+      const obj = { single: 'single quoted', double: 'double quoted', spaced: 'has spaces' }
+      const result = sg.slimgify(obj)
+      expect(result).toContain('single "single quoted"')
+      expect(result).toContain('double "double quoted"')
+      expect(result).toContain('spaced "has spaces"')
+    })
+
+    test('serializes unquoted strings when appropriate', () => {
+      const obj = { key: 'unquoted-value' }
+      const result = sg.slimgify(obj)
+      // Strings are quoted for consistency with the format
+      expect(result).toBe('key "unquoted-value"')
+    })
+  })
+
+  describe('block strings', () => {
+    test('serializes block strings for multi-line strings', () => {
+      const obj = {
+        message: 'Hello\nWorld',
+      }
+      const result = sg.slimgify(obj)
+      expect(result).toContain('message """')
+      expect(result).toContain('  Hello')
+      expect(result).toContain('  World')
+      expect(result).toContain('"""')
+    })
+
+    test('preserves blank lines in block strings', () => {
+      const obj = {
+        text: 'Line 1\n\nLine 2',
+      }
+      const result = sg.slimgify(obj)
+      const parsed = sg.parse(result)
+      expect(parsed.text).toBe('Line 1\n\nLine 2')
+    })
+  })
+
+  describe('arrays', () => {
+    test('serializes inline arrays', () => {
+      const obj = { items: ['a', 'b', 'c'] }
+      const result = sg.slimgify(obj)
+      expect(result).toContain('items ["a", "b", "c"]')
+    })
+
+    test('serializes multi-line arrays for long arrays', () => {
+      const obj = { items: ['a', 'b', 'c', 'd', 'e'] }
+      const result = sg.slimgify(obj)
+      expect(result).toContain('items [')
+      expect(result).toContain('  "a"')
+      expect(result).toContain(']')
+    })
+
+    test('serializes empty arrays', () => {
+      const obj = { empty: [] }
+      const result = sg.slimgify(obj)
+      expect(result).toContain('empty []')
+    })
+
+    test('serializes arrays with mixed types', () => {
+      const obj = { mixed: ['string', 123, true, null] }
+      const result = sg.slimgify(obj)
+      const parsed = sg.parse(result)
+      expect(parsed.mixed).toEqual(['string', 123, true, null])
+    })
+
+    test('serializes arrays with block strings', () => {
+      const obj = {
+        messages: [
+          'short',
+          'This is a\nlonger message',
+          'another',
+        ],
+      }
+      const result = sg.slimgify(obj)
+      const parsed = sg.parse(result)
+      expect(parsed.messages).toEqual([
+        'short',
+        'This is a\nlonger message',
+        'another',
+      ])
+    })
+  })
+
+  describe('round-trip tests', () => {
+    test('parse and slimgify produce equivalent results', () => {
+      const input = `
+name "John"
+age 30
+active true
+`
+      const parsed = sg.parse(input)
+      const serialized = sg.slimgify(parsed)
+      const reparsed = sg.parse(serialized)
+      expect(reparsed).toEqual(parsed)
+    })
+
+    test('handles nested objects round-trip', () => {
+      const input = `
+user
+  name "John"
+  age 30
+`
+      const parsed = sg.parse(input)
+      const serialized = sg.slimgify(parsed)
+      const reparsed = sg.parse(serialized)
+      expect(reparsed).toEqual(parsed)
+    })
+
+    test('handles arrays round-trip', () => {
+      const input = 'items ["a", "b", "c"]'
+      const parsed = sg.parse(input)
+      const serialized = sg.slimgify(parsed)
+      const reparsed = sg.parse(serialized)
+      expect(reparsed.items).toEqual(['a', 'b', 'c'])
+    })
+
+    test('handles block strings round-trip', () => {
+      const input = `
+message """
+  Hello
+  World
+"""
+`
+      const parsed = sg.parse(input)
+      const serialized = sg.slimgify(parsed)
+      const reparsed = sg.parse(serialized)
+      expect(reparsed.message).toBe('Hello\nWorld')
+    })
+
+    test('handles complex example round-trip', () => {
+      const input = `
+invoice
+  id 1234
+  date 2025-11-19
+  customer
+    name "ACME Corp"
+    contact """
+      Jane Doe
+      +1 555 1234
+    """
+  items
+    item
+      sku "WIDGET-1"
+      qty 10
+      price 9.99
+statuses ["janky", 123, "jankier", 2025-11-19T22:01:34.567, null]
+`
+      const parsed = sg.parse(input)
+      const serialized = sg.slimgify(parsed)
+      const reparsed = sg.parse(serialized)
+      expect(reparsed.invoice.id).toBe(1234)
+      expect(reparsed.invoice.customer.name).toBe('ACME Corp')
+      expect(reparsed.statuses).toHaveLength(5)
     })
   })
 })

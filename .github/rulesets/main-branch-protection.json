@@ -28,61 +28,22 @@
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
           {
-            "context": "build",
-            "integration_id": null
+            "context": "build"
           },
           {
-            "context": "test",
-            "integration_id": null
+            "context": "test"
           },
           {
-            "context": "lint",
-            "integration_id": null
+            "context": "lint"
           }
         ]
       }
     },
     {
-      "type": "required_deployments",
-      "parameters": {
-        "required_deployment_environments": []
-      }
+      "type": "required_linear_history"
     },
     {
-      "type": "required_linear_history",
-      "parameters": {
-        "required_linear_history": true
-      }
-    },
-    {
-      "type": "required_signatures",
-      "parameters": {
-        "required_signatures": false
-      }
-    },
-    {
-      "type": "lock_branch",
-      "parameters": {
-        "lock_branch": false
-      }
-    },
-    {
-      "type": "required_conversation_resolution",
-      "parameters": {
-        "required_conversation_resolution": true
-      }
-    },
-    {
-      "type": "non_fast_forward",
-      "parameters": {
-        "non_fast_forward": true
-      }
-    },
-    {
-      "type": "update",
-      "parameters": {
-        "update": false
-      }
+      "type": "non_fast_forward"
     }
   ]
 }
