@@ -1,193 +1,217 @@
 import { type NodeValue } from './types.js'
 
-const slimgifyValue = (value: NodeValue, indentLevel = 0): string => {
+const ESCAPE_REGEX = /["\\\n\r\t]/g
+const ESCAPE_MAP: Record<string, string> = {
+  '"': '\\"',
+  '\\': '\\\\',
+  '\n': '\\n',
+  '\r': '\\r',
+  '\t': '\\t',
+}
+
+const escapeString = (str: string): string => {
+  return str.replace(ESCAPE_REGEX, (char) => ESCAPE_MAP[char])
+}
+
+const slimgifyValue = (value: NodeValue, buffer: string[], indent: string): void => {
   // Handle null and undefined
-  if (value === null) return 'null'
-  if (value === undefined) return 'undefined'
+  if (value === null) {
+    buffer.push('null')
+    return
+  }
+  if (value === undefined) {
+    buffer.push('undefined')
+    return
+  }
 
   // Handle Date objects
   if (value instanceof Date) {
-    return value.toISOString()
+    buffer.push(value.toISOString())
+    return
   }
 
   // Handle booleans
   if (typeof value === 'boolean') {
-    return value ? 'true' : 'false'
+    buffer.push(value ? 'true' : 'false')
+    return
   }
 
   // Handle numbers
   if (typeof value === 'number') {
-    return value.toString()
+    buffer.push(value.toString())
+    return
   }
 
   // Handle strings
   if (typeof value === 'string') {
     // Use block string if contains newlines
     if (value.includes('\n')) {
-      const indent = '  '.repeat(indentLevel + 1)
-      const lines = value.split('\n')
-      const baseIndent = '  '.repeat(indentLevel)
-      return `"""\n${lines.map(line => `${indent}${line}`).join('\n')}\n${baseIndent}"""`
+      const contentIndent = indent + '  '
+      buffer.push('"""')
+
+      let start = 0
+      let pos = value.indexOf('\n')
+      while (pos !== -1) {
+        buffer.push('\n', contentIndent, value.slice(start, pos))
+        start = pos + 1
+        pos = value.indexOf('\n', start)
+      }
+      buffer.push('\n', contentIndent, value.slice(start))
+      buffer.push('\n', indent, '"""')
+      return
     }
-    
+
     // Check if quoting is needed
-    const needsQuoting = value.includes(' ') || 
-                         value.includes('\t') ||
-                         value === '' ||
-                         /^[0-9]/.test(value) ||
-                         value === 'true' ||
-                         value === 'false' ||
-                         value === 'null' ||
-                         value === 'undefined' ||
-                         /^\d{4}-\d{2}-\d{2}/.test(value) // Looks like a date
-    
+    const needsQuoting = value.includes(' ') ||
+      value.includes('\t') ||
+      value === '' ||
+      (value.length > 0 && value.charCodeAt(0) >= 48 && value.charCodeAt(0) <= 57) || // Starts with digit
+      value === 'true' ||
+      value === 'false' ||
+      value === 'null' ||
+      value === 'undefined' ||
+      (value.length >= 10 && value.charCodeAt(4) === 45 && value.charCodeAt(7) === 45) // Looks like date 2025-01-01
+
     if (needsQuoting) {
-      // Escape special characters
-      const escaped = value
-        .replace(/\\/g, '\\\\')
-        .replace(/"/g, '\\"')
-        .replace(/\n/g, '\\n')
-        .replace(/\r/g, '\\r')
-        .replace(/\t/g, '\\t')
-      return `"${escaped}"`
+      buffer.push('"', escapeString(value), '"')
+    } else {
+      buffer.push(value)
     }
-    
-    return value
+    return
   }
 
   // Handle arrays
   if (Array.isArray(value)) {
-    return slimgifyArray(value, indentLevel)
+    slimgifyArray(value, buffer, indent)
+    return
   }
 
-  // Handle objects (after checking arrays and other types, value must be an object)
+  // Handle objects
   if (typeof value === 'object') {
-    return slimgifyObject(value, indentLevel)
+    slimgifyObject(value, buffer, indent)
+    return
   }
 
-  return String(value)
+  buffer.push(String(value))
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const slimgifyArray = (arr: any[], indentLevel = 0): string => {
+const slimgifyArray = (arr: any[], buffer: string[], indent: string): void => {
   // Empty array
   if (arr.length === 0) {
-    return '[]'
+    buffer.push('[]')
+    return
   }
 
   // Decide between inline and multi-line format
-  const shouldUseMultiLine = arr.length > 3 || arr.some(item => 
+  const shouldUseMultiLine = arr.length > 3 || arr.some(item =>
     (typeof item === 'object' && item !== null && !Array.isArray(item) && !(item instanceof Date)) ||
     (typeof item === 'string' && item.includes('\n'))
   )
 
   if (shouldUseMultiLine) {
-    const indent = '  '.repeat(indentLevel)
-    const itemIndent = '  '.repeat(indentLevel + 1)
-    const arrayLines: string[] = []
-    for (const item of arr) {
+    const itemIndent = indent + '  '
+    buffer.push('[')
+
+    for (let i = 0; i < arr.length; i++) {
+      const item = arr[i]
+      buffer.push('\n', itemIndent)
+
       // Check if item is a block string
       if (typeof item === 'string' && item.includes('\n')) {
-        // Format block string with proper indentation
-        arrayLines.push(`${itemIndent}"""`)
-        const blockLines = item.split('\n')
-        const blockIndent = '  '.repeat(indentLevel + 2)
-        for (const blockLine of blockLines) {
-          arrayLines.push(`${blockIndent}${blockLine}`)
+        buffer.push('"""')
+        const blockIndent = itemIndent + '  '
+
+        let start = 0
+        let pos = item.indexOf('\n')
+        while (pos !== -1) {
+          buffer.push('\n', blockIndent, item.slice(start, pos))
+          start = pos + 1
+          pos = item.indexOf('\n', start)
         }
-        arrayLines.push(`${itemIndent}"""`)
+        buffer.push('\n', blockIndent, item.slice(start))
+        buffer.push('\n', itemIndent, '"""')
       } else {
         // Simple value - format it
         // Always quote strings in multi-line arrays
-        let itemStr: string
         if (typeof item === 'string' && !item.includes('\n')) {
-          const escaped = item
-            .replace(/\\/g, '\\\\')
-            .replace(/"/g, '\\"')
-            .replace(/\n/g, '\\n')
-            .replace(/\r/g, '\\r')
-            .replace(/\t/g, '\\t')
-          itemStr = `"${escaped}"`
+          buffer.push('"', escapeString(item), '"')
         } else {
-          itemStr = slimgifyValue(item, 0)
+          slimgifyValue(item, buffer, itemIndent)
         }
-        arrayLines.push(`${itemIndent}${itemStr}`)
       }
     }
-    return `[\n${arrayLines.join('\n')}\n${indent}]`
+    buffer.push('\n', indent, ']')
   } else {
     // Inline array
-    const items = arr.map(item => {
+    buffer.push('[')
+    for (let i = 0; i < arr.length; i++) {
+      if (i > 0) buffer.push(', ')
+      const item = arr[i]
+
       // Always quote strings in arrays
       if (typeof item === 'string') {
-        const escaped = item
-          .replace(/\\/g, '\\\\')
-          .replace(/"/g, '\\"')
-          .replace(/\n/g, '\\n')
-          .replace(/\r/g, '\\r')
-          .replace(/\t/g, '\\t')
-        return `"${escaped}"`
+        buffer.push('"', escapeString(item), '"')
+      } else {
+        slimgifyValue(item, buffer, indent)
       }
-      return slimgifyValue(item, 0)
-    })
-    return `[${items.join(', ')}]`
+    }
+    buffer.push(']')
   }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const slimgifyObject = (obj: any, indentLevel = 0): string => {
-  const indent = '  '.repeat(indentLevel)
-  const lines: string[] = []
+const slimgifyObject = (obj: any, buffer: string[], indent: string): void => {
   const keys = Object.keys(obj)
-  
-  for (const key of keys) {
+  const len = keys.length
+
+  for (let i = 0; i < len; i++) {
+    if (i > 0) buffer.push('\n')
+    const key = keys[i]
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const value = obj[key]
-    
+
+    buffer.push(indent, key)
+
     // Handle arrays - serialize as array syntax, not repeated keys
     if (Array.isArray(value)) {
-      const arrayStr = slimgifyArray(value, indentLevel)
-      lines.push(`${indent}${key} ${arrayStr}`)
+      buffer.push(' ')
+      slimgifyArray(value, buffer, indent)
     } else {
       if (typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date)) {
         // Nested object
-        lines.push(`${indent}${key}`)
-        const nestedLines = slimgifyObject(value, indentLevel + 1).split('\n')
-        lines.push(...nestedLines)
+        buffer.push('\n')
+        slimgifyObject(value, buffer, indent + '  ')
       } else {
         // Simple value
+        buffer.push(' ')
         // Check if it's a block string (contains newlines)
         if (typeof value === 'string' && value.includes('\n')) {
           // Block string - format specially
-          lines.push(`${indent}${key} """`)
-          const blockLines = value.split('\n')
-          const blockIndent = '  '.repeat(indentLevel + 1)
-          for (const blockLine of blockLines) {
-            lines.push(`${blockIndent}${blockLine}`)
+          buffer.push('"""')
+          const blockIndent = indent + '  '
+
+          let start = 0
+          let pos = value.indexOf('\n')
+          while (pos !== -1) {
+            buffer.push('\n', blockIndent, value.slice(start, pos))
+            start = pos + 1
+            pos = value.indexOf('\n', start)
           }
-          lines.push(`${indent}"""`)
+          buffer.push('\n', blockIndent, value.slice(start))
+          buffer.push('\n', indent, '"""')
         } else {
           // Regular value
           // Quote strings in object values for consistency with example file
-          let valueStr: string
           if (typeof value === 'string' && !value.includes('\n')) {
-            const escaped = value
-              .replace(/\\/g, '\\\\')
-              .replace(/"/g, '\\"')
-              .replace(/\n/g, '\\n')
-              .replace(/\r/g, '\\r')
-              .replace(/\t/g, '\\t')
-            valueStr = `"${escaped}"`
+            buffer.push('"', escapeString(value), '"')
           } else {
-            valueStr = slimgifyValue(value, indentLevel)
+            slimgifyValue(value, buffer, indent)
           }
-          lines.push(`${indent}${key} ${valueStr}`)
         }
       }
     }
   }
-  
-  return lines.join('\n')
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -196,16 +220,21 @@ export const slimgify = (obj: any): string => {
     return ''
   }
 
+  const buffer: string[] = []
+
   // Handle arrays and dates first (they are objects in JS)
   if (Array.isArray(obj) || obj instanceof Date) {
-    return slimgifyValue(obj, 0)
+    slimgifyValue(obj, buffer, '')
+    return buffer.join('')
   }
 
   // If it's not an object, wrap it
   if (typeof obj !== 'object') {
-    return slimgifyValue(obj, 0)
+    slimgifyValue(obj, buffer, '')
+    return buffer.join('')
   }
 
   // Handle objects
-  return slimgifyObject(obj, 0)
+  slimgifyObject(obj, buffer, '')
+  return buffer.join('')
 }
