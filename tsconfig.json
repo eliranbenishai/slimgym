@@ -16,6 +16,6 @@
     "resolveJsonModule": true
   },
   "include": ["index.ts", "parse.ts", "slimgify.ts", "types.ts"],
-  "exclude": ["node_modules", "dist", "example.sg", "eslint.config.ts", "vitest.config.ts", "parser.test.ts"]
+  "exclude": ["node_modules", "dist", "example.sg", "eslint.config.ts", "vitest.config.ts", "slimgym.test.ts", "slimgym.stress.test.ts"]
 }
 
