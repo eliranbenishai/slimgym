@@ -1,8 +1,6 @@
 import { ParseError, type NodeObject, type NodeValue } from './types.js'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const createParsedConfig = <T = any>(data: T): T => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const convertToJSON = (value: any): any => {
     if (value instanceof Date) {
       return value.toISOString()
@@ -11,11 +9,9 @@ const createParsedConfig = <T = any>(data: T): T => {
       return value.map(convertToJSON)
     }
     if (typeof value === 'object' && value !== null && !(value instanceof Date)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result: any = {}
       for (const key in value) {
         if (Object.prototype.hasOwnProperty.call(value, key)) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
           result[key] = convertToJSON(value[key])
         }
       }
@@ -24,16 +20,13 @@ const createParsedConfig = <T = any>(data: T): T => {
     return value
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const toJSON = (): any => convertToJSON(data)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return new Proxy(data as any, {
     get: (target, prop) => {
       if (prop === 'toJSON') {
         return toJSON
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return
       return target[prop as keyof typeof target]
     },
     has: (target, prop) => {
@@ -59,7 +52,6 @@ const createParsedConfig = <T = any>(data: T): T => {
   }) as T
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const parse = <T = any>(input: string): T => {
   if (typeof input !== 'string') {
     throw new ParseError('Input must be a string')
@@ -121,25 +113,6 @@ export const parse = <T = any>(input: string): T => {
     const key = input.slice(keyStart, i)
 
     // Validate key (fast check)
-    // If we want to be strict: /^[a-zA-Z0-9_-]+$/
-    // But we just scanned until space. Let's do a quick check if needed or trust the scanner.
-    // The scanner stopped at space. We should check if we hit something invalid before space?
-    // For performance, let's assume if it stopped at space it's the key, 
-    // but we should check if the key is valid if we want to maintain strictness.
-    // Let's do a quick regex check only if we suspect invalid chars, or just check the char codes in the loop above.
-    // Re-implementing key scan with validation:
-    /*
-    let k = keyStart
-    while (k < i) {
-      const c = input.charCodeAt(k)
-      if (!((c >= 97 && c <= 122) || (c >= 65 && c <= 90) || (c >= 48 && c <= 57) || c === 95 || c === 45)) {
-         throw new ParseError(...)
-      }
-      k++
-    }
-    */
-    // For now, let's stick to the previous logic's strictness but maybe optimize later. 
-    // The previous logic used regex `^[a-zA-Z0-9_-]+`.
     if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
       // It might be that we didn't find a space and took the whole line, 
       // or the key contains invalid chars.
@@ -163,15 +136,11 @@ export const parse = <T = any>(input: string): T => {
     } else {
       const char = input.charCodeAt(i)
 
-      if (char === 91) { // [
-        // Array start
-        // Check if it's a multi-line array or inline
-        // Scan for ] on the same line
-        // Scan for the last ] on the line to handle nested arrays
+      if (char === 91) {
         let hasClosing = false
         let j = lineEnd - 1
         while (j > i) {
-          if (input.charCodeAt(j) === 93) { // ]
+          if (input.charCodeAt(j) === 93) {
             hasClosing = true
             break
           }
@@ -179,21 +148,16 @@ export const parse = <T = any>(input: string): T => {
         }
 
         if (hasClosing) {
-          // Inline array
           const arrayContent = input.slice(i + 1, j)
           if (arrayContent.trim().length === 0) {
-            // Empty array
             value = []
           } else {
-            // Parse inline array items
             value = parseArrayItems(arrayContent, lineIndex, input.slice(lineStart, lineEnd))
           }
           pos = lineEnd + 1
           lineIndex++
           lineStart = pos
         } else {
-          // Multi-line array
-          // We need to consume lines until we find the closing bracket at the same indent
           const arrayItems: string[] = []
           const arrayIndent = indent
           let arrayLineIndex = lineIndex + 1
@@ -230,11 +194,6 @@ export const parse = <T = any>(input: string): T => {
             }
 
             if (alIndent <= arrayIndent) {
-              // Dedent without closing bracket -> error or implicit close?
-              // Previous logic implies we break and let the outer loop handle it? 
-              // No, arrays must be closed.
-              // But wait, "If indent is less than or equal to array indent and not empty, we're done" 
-              // was in the previous logic, but then it threw "Unclosed array".
               break
             }
 
@@ -275,7 +234,7 @@ export const parse = <T = any>(input: string): T => {
                   // Empty line
                   if (blockIndent !== null) blockLines.push('')
                 } else {
-                  if (blockIndent === null) blockIndent = blIndent
+                  blockIndent ??= blIndent
 
                   if (blIndent >= blockIndent) {
                     blockLines.push(input.slice(arrayPos + blockIndent, blEnd))
@@ -314,17 +273,6 @@ export const parse = <T = any>(input: string): T => {
             // We successfully parsed the array
             // Now we need to parse the values in arrayItems
             value = arrayItems.map(item => parseValue(item))
-
-            // We already updated pos, lineStart, lineIndex in the loop when foundClosing
-            // So we need to continue the outer loop immediately
-            // But we still need to attach the value to the parent
-            // So we don't 'continue' here, we just fall through to attachment logic
-            // But we must ensure we don't process the current line again
-            // The outer loop increments are done at start of iteration or we manage them manually.
-            // My outer loop structure is `while (pos < len)`.
-            // I calculate lineEnd at start.
-            // So if I updated pos, I should be good for next iteration.
-            // BUT, I need to finish processing THIS key-value pair first.
           }
         }
       } else if (char === 34 && input.charCodeAt(i + 1) === 34 && input.charCodeAt(i + 2) === 34) { // """
@@ -367,7 +315,7 @@ export const parse = <T = any>(input: string): T => {
             break
           }
 
-          if (blockIndent === null) blockIndent = blIndent
+          blockIndent ??= blIndent
 
           if (blIndent >= blockIndent) {
             blockLines.push(input.slice(pos + blockIndent, blEnd))
@@ -524,7 +472,7 @@ const parseValue = (token: string): NodeValue => {
   if ((firstChar === 34 && token.endsWith('"')) || (firstChar === 39 && token.endsWith("'"))) {
     const inner = token.slice(1, -1)
     // Fast unescape
-    if (inner.indexOf('\\') === -1) return inner
+    if (!inner.includes('\\')) return inner
 
     return inner.replace(/\\(["'nrt\\])/g, (_, ch) => {
       switch (ch) {
@@ -542,6 +490,3 @@ const parseValue = (token: string): NodeValue => {
   return token
 }
 
-const isPlainObject = (v: unknown): v is NodeObject => {
-  return typeof v === 'object' && v !== null && !Array.isArray(v) && !(v instanceof Date)
-}

@@ -46,7 +46,7 @@ const slimgifyValue = (value: NodeValue, buffer: string[], indent: string): void
   if (typeof value === 'string') {
     // Use block string if contains newlines
     if (value.includes('\n')) {
-      const contentIndent = indent + '  '
+      const contentIndent = `${indent}  `
       buffer.push('"""')
 
       let start = 0
@@ -95,7 +95,6 @@ const slimgifyValue = (value: NodeValue, buffer: string[], indent: string): void
   buffer.push(String(value))
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const slimgifyArray = (arr: any[], buffer: string[], indent: string): void => {
   // Empty array
   if (arr.length === 0) {
@@ -110,17 +109,16 @@ const slimgifyArray = (arr: any[], buffer: string[], indent: string): void => {
   )
 
   if (shouldUseMultiLine) {
-    const itemIndent = indent + '  '
+    const itemIndent = `${indent}  `
     buffer.push('[')
 
-    for (let i = 0; i < arr.length; i++) {
-      const item = arr[i]
+    for (const item of arr) {
       buffer.push('\n', itemIndent)
 
       // Check if item is a block string
       if (typeof item === 'string' && item.includes('\n')) {
         buffer.push('"""')
-        const blockIndent = itemIndent + '  '
+        const blockIndent = `${itemIndent}  `
 
         let start = 0
         let pos = item.indexOf('\n')
@@ -160,7 +158,6 @@ const slimgifyArray = (arr: any[], buffer: string[], indent: string): void => {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const slimgifyObject = (obj: any, buffer: string[], indent: string): void => {
   const keys = Object.keys(obj)
   const len = keys.length
@@ -168,7 +165,6 @@ const slimgifyObject = (obj: any, buffer: string[], indent: string): void => {
   for (let i = 0; i < len; i++) {
     if (i > 0) buffer.push('\n')
     const key = keys[i]
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const value = obj[key]
 
     buffer.push(indent, key)
@@ -181,7 +177,7 @@ const slimgifyObject = (obj: any, buffer: string[], indent: string): void => {
       if (typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date)) {
         // Nested object
         buffer.push('\n')
-        slimgifyObject(value, buffer, indent + '  ')
+        slimgifyObject(value, buffer, `${indent}  `)
       } else {
         // Simple value
         buffer.push(' ')
@@ -189,7 +185,7 @@ const slimgifyObject = (obj: any, buffer: string[], indent: string): void => {
         if (typeof value === 'string' && value.includes('\n')) {
           // Block string - format specially
           buffer.push('"""')
-          const blockIndent = indent + '  '
+          const blockIndent = `${indent}  `
 
           let start = 0
           let pos = value.indexOf('\n')
@@ -214,7 +210,6 @@ const slimgifyObject = (obj: any, buffer: string[], indent: string): void => {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const slimgify = (obj: any): string => {
   if (obj === null || obj === undefined) {
     return ''
