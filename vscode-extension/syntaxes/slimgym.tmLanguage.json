@@ -1,0 +1,97 @@
+{
+    "scopeName": "source.slimgym",
+    "patterns": [
+        {
+            "include": "#comment"
+        },
+        {
+            "include": "#string"
+        },
+        {
+            "include": "#date"
+        },
+        {
+            "include": "#number"
+        },
+        {
+            "include": "#keyword"
+        },
+        {
+            "include": "#key"
+        },
+        {
+            "include": "#array"
+        }
+    ],
+    "repository": {
+        "comment": {
+            "match": "#.*$",
+            "name": "comment.line.number-sign"
+        },
+        "string": {
+            "patterns": [
+                {
+                    "begin": "\"\"\"",
+                    "end": "\"\"\"",
+                    "name": "string.quoted.docstring.multi"
+                },
+                {
+                    "begin": "\"",
+                    "end": "\"",
+                    "name": "string.quoted.double",
+                    "patterns": [
+                        {
+                            "match": "\\\\.",
+                            "name": "constant.character.escape"
+                        }
+                    ]
+                },
+                {
+                    "begin": "'",
+                    "end": "'",
+                    "name": "string.quoted.single",
+                    "patterns": [
+                        {
+                            "match": "\\\\.",
+                            "name": "constant.character.escape"
+                        }
+                    ]
+                }
+            ]
+        },
+        "number": {
+            "match": "\\b-?\\d+(\\.\\d+)?\\b",
+            "name": "constant.numeric"
+        },
+        "keyword": {
+            "match": "\\b(null|undefined|true|false)\\b",
+            "name": "constant.language"
+        },
+        "date": {
+            "match": "\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?)?",
+            "name": "constant.other.date"
+        },
+        "key": {
+            "match": "^\\s*([a-zA-Z0-9_-]+)(?=\\s|$)",
+            "captures": {
+                "1": {
+                    "name": "variable.other.property"
+                }
+            }
+        },
+        "array": {
+            "begin": "\\[",
+            "end": "\\]",
+            "name": "meta.array",
+            "patterns": [
+                {
+                    "include": "$self"
+                },
+                {
+                    "match": ",",
+                    "name": "punctuation.separator.array"
+                }
+            ]
+        }
+    }
+}

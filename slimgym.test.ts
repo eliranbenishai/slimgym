@@ -404,7 +404,7 @@ popsicles [
       [null, 'null'],
       [123, 'number'],
       [{}, 'object'],
-   ])('throws ParseError for non-string input: %s', (input, type) => {
+    ])('throws ParseError for non-string input: %s', (input, type) => {
       expect(() => {
         // @ts-expect-error - testing invalid input
         sg.parse(input)
@@ -414,7 +414,7 @@ popsicles [
     test.each([
       ['key@name "value"'],
       ['key.name "value"'],
-   ])('throws ParseError for invalid key format: %s', (input) => {
+    ])('throws ParseError for invalid key format: %s', (input) => {
       expect(() => {
         sg.parse(input)
       }).toThrow(ParseError)
@@ -754,6 +754,19 @@ describe('slimgify', () => {
         'another',
       ])
     })
+  })
+
+  test('serializes array of objects as repeated keys', () => {
+    const obj = {
+      users: [
+        { name: 'Alice', age: 30 },
+        { name: 'Bob', age: 25 },
+      ],
+    }
+    const result = sg.slimgify(obj)
+    expect(result).toContain('users\n  name "Alice"')
+    expect(result).toContain('users\n  name "Bob"')
+    expect(result).not.toContain('users [')
   })
 
   describe('round-trip tests', () => {

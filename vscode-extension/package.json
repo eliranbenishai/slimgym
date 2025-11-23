@@ -1,0 +1,34 @@
+{
+    "name": "slimgym-vscode",
+    "displayName": "Slimgym",
+    "description": "Syntax highlighting for Slimgym configuration format",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.70.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "slimgym",
+                "aliases": [
+                    "Slimgym",
+                    "slimgym"
+                ],
+                "extensions": [
+                    ".sg"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "slimgym",
+                "scopeName": "source.slimgym",
+                "path": "./syntaxes/slimgym.tmLanguage.json"
+            }
+        ]
+    }
+}

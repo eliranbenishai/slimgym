@@ -163,10 +163,25 @@ const slimgifyObject = (obj: any, buffer: string[], indent: string): void => {
   const len = keys.length
 
   for (let i = 0; i < len; i++) {
-    if (i > 0) buffer.push('\n')
     const key = keys[i]
     const value = obj[key]
 
+    // Check if value is an array of plain objects
+    const isArrayOfObjects = Array.isArray(value) &&
+      value.length > 0 &&
+      value.every((item: any) => typeof item === 'object' && item !== null && !Array.isArray(item) && !(item instanceof Date))
+
+    if (isArrayOfObjects) {
+      for (let j = 0; j < value.length; j++) {
+        if (i > 0 || j > 0) buffer.push('\n')
+        buffer.push(indent, key)
+        buffer.push('\n')
+        slimgifyObject(value[j], buffer, `${indent}  `)
+      }
+      continue
+    }
+
+    if (i > 0) buffer.push('\n')
     buffer.push(indent, key)
 
     // Handle arrays - serialize as array syntax, not repeated keys

@@ -2,7 +2,7 @@
 
 SlimGym is an indentation-based configuration format parser that combines the simplicity of indentation-based syntax with modern features like block strings, arrays, comments and type inference.
 
-The motivation behind this format is to create a clean and concise configuration format that is easy to read for both humans and machines, but also supports as many contemporary application needs as possible.
+The motivation behind this format was to create a clean and concise configuration format that is easy to read for both humans and machines, but also supports as many contemporary application needs as possible.
 
 ## Installation
 

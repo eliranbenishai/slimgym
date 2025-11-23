@@ -1,0 +1,29 @@
+# Slimgym Syntax Test File
+
+# Comments should be grayed out
+server
+  host "localhost"
+  port 8080
+  enabled true
+  timeout null
+
+database
+  # Nested comment
+  url "postgres://user:pass@db:5432/slimgym"
+  pool_size 10
+  connected_at 2023-10-27T10:00:00Z
+
+features [
+  "auth",
+  "logging",
+  """
+  Multi-line
+  String
+  Block
+  """
+]
+
+nested
+  level1
+    level2
+      value 123.45

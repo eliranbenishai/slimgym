@@ -75,7 +75,7 @@ describe('parse stress tests', () => {
   })
 
   test('multiple block strings - 100 strings', () => {
-    const blocks = Array.from({ length: 100 }, (_, i) => 
+    const blocks = Array.from({ length: 100 }, (_, i) =>
       `text${i} """\nContent for block ${i}\n"""`
     ).join('\n')
     const time = measureTime(() => {
@@ -88,7 +88,7 @@ describe('parse stress tests', () => {
   })
 
   test('complex nested structure - 50 objects with arrays', () => {
-    const objects = Array.from({ length: 50 }, (_, i) => 
+    const objects = Array.from({ length: 50 }, (_, i) =>
       `obj${i}\n  name "Object${i}"\n  tags ["tag1", "tag2", "tag3"]\n  nested\n    value ${i}`
     ).join('\n')
     const time = measureTime(() => {
@@ -101,7 +101,7 @@ describe('parse stress tests', () => {
   })
 
   test('repeated keys - 200 repetitions', () => {
-    const items = Array.from({ length: 200 }, (_, i) => 
+    const items = Array.from({ length: 200 }, (_, i) =>
       `item\n  id ${i}\n  name "Item${i}"`
     ).join('\n')
     const time = measureTime(() => {
@@ -135,7 +135,7 @@ describe('parse stress tests', () => {
   })
 
   test('very large input - 50KB', () => {
-    const lines = Array.from({ length: 5000 }, (_, i) => 
+    const lines = Array.from({ length: 5000 }, (_, i) =>
       `key${i} "value${i}"`
     ).join('\n')
     const time = measureTime(() => {
@@ -148,7 +148,7 @@ describe('parse stress tests', () => {
   })
 
   test('block strings with quotes - 50 strings', () => {
-    const blocks = Array.from({ length: 50 }, (_, i) => 
+    const blocks = Array.from({ length: 50 }, (_, i) =>
       `code${i} """\nfunction test${i}() {\n  console.log("Hello ${i}")\n  return true\n}\n"""`
     ).join('\n')
     const time = measureTime(() => {
@@ -172,7 +172,7 @@ describe('parse stress tests', () => {
   })
 
   test('comments everywhere - 1000 lines with comments', () => {
-    const lines = Array.from({ length: 1000 }, (_, i) => 
+    const lines = Array.from({ length: 1000 }, (_, i) =>
       i % 2 === 0 ? `# Comment ${i}\nkey${i} "value${i}"` : `key${i} "value${i}" # Inline comment`
     ).join('\n')
     const time = measureTime(() => {
@@ -189,17 +189,17 @@ describe('parse stress tests', () => {
     const loadStart = performance.now()
     const content = await readFile(filePath, 'utf-8')
     const loadTime = (performance.now() - loadStart) * 1000
-    
+
     const parseTime = measureTime(() => {
       const result = sg.parse(content)
       if (!result || Object.keys(result).length === 0) {
         throw new Error('Unexpected result')
       }
     })
-    
+
     const totalTime = loadTime + parseTime
     const lines = content.split('\n').length
-    
+
     console.log(`✓ giant.sg file (${lines.toLocaleString()} lines):`)
     console.log(`    - File load time: ${loadTime.toFixed(2)} μs`)
     console.log(`    - Parse time: ${parseTime.toFixed(2)} μs`)
@@ -317,8 +317,13 @@ describe('slimgify stress tests', () => {
     const obj = { item: items }
     const time = measureTime(() => {
       const result = sg.slimgify(obj)
-      if (!result.includes('item [')) {
-        throw new Error('Unexpected result')
+      // Should use repeated keys, so "item [" should NOT be present
+      if (result.includes('item [')) {
+        throw new Error('Unexpected result: found array syntax')
+      }
+      // Should contain repeated keys
+      if (!result.includes('item\n  id 0')) {
+        throw new Error('Unexpected result: missing repeated keys')
       }
     })
     console.log(`✓ Arrays with repeated keys (200 items): ${time.toFixed(2)} μs`)
@@ -410,16 +415,16 @@ describe('slimgify stress tests', () => {
   test('giant.sg file round-trip', async () => {
     const filePath = join(process.cwd(), 'giant.sg')
     const content = await readFile(filePath, 'utf-8')
-    
+
     const parseTime = measureTime(() => {
       sg.parse(content)
     })
-    
+
     const parsed = sg.parse(content)
     const slimgifyTime = measureTime(() => {
       sg.slimgify(parsed)
     })
-    
+
     // Test round-trip but don't fail if there are parsing issues
     // (giant.sg might have edge cases that don't round-trip perfectly)
     let roundTripTime = 0
@@ -437,9 +442,9 @@ describe('slimgify stress tests', () => {
       // Round-trip might fail for some edge cases in giant.sg
       roundTripTime = 0
     }
-    
+
     const lines = content.split('\n').length
-    
+
     console.log(`✓ giant.sg file round-trip (${lines.toLocaleString()} lines):`)
     console.log(`    - Parse time: ${parseTime.toFixed(2)} μs`)
     console.log(`    - Slimgify time: ${slimgifyTime.toFixed(2)} μs`)
