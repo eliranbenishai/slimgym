@@ -93,15 +93,21 @@ export const parse = <T = any>(input: string): T => {
 
     const firstChar = input.charCodeAt(i)
     if (firstChar === 35) { // # is 35
-      // Comment
-      lineIndex++
-      pos = lineEnd + 1
-      lineStart = pos
-      continue
+      // Check if it's a comment (must be followed by space or newline)
+      // If i+1 is lineEnd, it's a comment (empty comment)
+      // If input[i+1] is space, it's a comment
+      if (i + 1 === lineEnd || input.charCodeAt(i + 1) === 32) {
+        // Comment
+        lineIndex++
+        pos = lineEnd + 1
+        lineStart = pos
+        continue
+      }
+      // Otherwise, it's a key starting with #
     }
 
     // 3. Parse Key
-    // Key is [a-zA-Z0-9_-]+
+    // Key is [a-zA-Z0-9_-]+ or starts with #
     const keyStart = i
     while (i < lineEnd) {
       const code = input.charCodeAt(i)
@@ -110,7 +116,14 @@ export const parse = <T = any>(input: string): T => {
       i++
     }
 
-    const key = input.slice(keyStart, i)
+    let key = input.slice(keyStart, i)
+    let forceArray = false
+
+    // Check for @ prefix
+    if (key.startsWith('@')) {
+      forceArray = true
+      key = key.slice(1)
+    }
 
     // Validate key (fast check)
     if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
@@ -118,7 +131,7 @@ export const parse = <T = any>(input: string): T => {
       // or the key contains invalid chars.
       // If the line was just "key", i would be lineEnd.
       // If "key:", invalid.
-      throw new ParseError(`Invalid key format: "${key}"`, lineIndex, input.slice(lineStart, lineEnd))
+      throw new ParseError(`Invalid key format: "${input.slice(keyStart, i)}"`, lineIndex, input.slice(lineStart, lineEnd))
     }
 
     // 4. Parse Value
@@ -177,7 +190,7 @@ export const parse = <T = any>(input: string): T => {
             }
 
             // Skip blank/comment
-            if (k === alEnd || input.charCodeAt(k) === 35) {
+            if (k === alEnd || (input.charCodeAt(k) === 35 && (k + 1 === alEnd || input.charCodeAt(k + 1) === 32))) {
               arrayPos = alEnd + 1
               arrayLineIndex++
               continue
@@ -360,7 +373,11 @@ export const parse = <T = any>(input: string): T => {
         parent[key] = [existing, value]
       }
     } else {
-      parent[key] = value
+      if (forceArray) {
+        parent[key] = [value]
+      } else {
+        parent[key] = value
+      }
     }
 
     // If value is object, push to stack

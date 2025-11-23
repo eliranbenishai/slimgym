@@ -182,13 +182,39 @@ const slimgifyObject = (obj: any, buffer: string[], indent: string): void => {
     }
 
     if (i > 0) buffer.push('\n')
-    buffer.push(indent, key)
 
     // Handle arrays - serialize as array syntax, not repeated keys
     if (Array.isArray(value)) {
-      buffer.push(' ')
-      slimgifyArray(value, buffer, indent)
+      // Check for single item array - use @key syntax
+      if (value.length === 1) {
+        buffer.push(indent, '@', key, ' ')
+        const item = value[0]
+        if (typeof item === 'string') {
+          if (!item.includes('\n')) {
+            buffer.push('"', escapeString(item), '"')
+          } else {
+            // Block string logic
+            buffer.push('"""')
+            const blockIndent = `${indent}  `
+            let start = 0
+            let pos = item.indexOf('\n')
+            while (pos !== -1) {
+              buffer.push('\n', blockIndent, item.slice(start, pos))
+              start = pos + 1
+              pos = item.indexOf('\n', start)
+            }
+            buffer.push('\n', blockIndent, item.slice(start))
+            buffer.push('\n', indent, '"""')
+          }
+        } else {
+          slimgifyValue(item, buffer, indent)
+        }
+      } else {
+        buffer.push(indent, key, ' ')
+        slimgifyArray(value, buffer, indent)
+      }
     } else {
+      buffer.push(indent, key)
       if (typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date)) {
         // Nested object
         buffer.push('\n')
