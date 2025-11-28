@@ -1,4 +1,10 @@
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { ParseError, type NodeObject, type NodeValue } from './types.js'
+
+export interface ParseOptions {
+  baseDir?: string
+}
 
 const createParsedConfig = <T = any>(data: T): T => {
   const convertToJSON = (value: any): any => {
@@ -52,7 +58,7 @@ const createParsedConfig = <T = any>(data: T): T => {
   }) as T
 }
 
-export const parse = <T = any>(input: string): T => {
+export const parse = <T = any>(input: string, options?: ParseOptions): T => {
   if (typeof input !== 'string') {
     throw new ParseError('Input must be a string')
   }
@@ -64,9 +70,12 @@ export const parse = <T = any>(input: string): T => {
 
   const root: NodeObject = {}
   // Stack stores { indent, obj }
-  // We use a fixed size array or just push/pop. 
-  // Pre-allocating stack might be overkill but let's keep it simple.
   const stack: { indent: number; obj: NodeObject }[] = [{ indent: -1, obj: root }]
+
+  // Helper to parse values with options
+  const parseValueWithOptions = (token: string, lineNumber?: number, line?: string): NodeValue => {
+    return parseValue(token, options, lineNumber, line)
+  }
 
   while (pos < len) {
     // Find end of line
@@ -94,8 +103,6 @@ export const parse = <T = any>(input: string): T => {
     const firstChar = input.charCodeAt(i)
     if (firstChar === 35) { // # is 35
       // Check if it's a comment (must be followed by space or newline)
-      // If i+1 is lineEnd, it's a comment (empty comment)
-      // If input[i+1] is space, it's a comment
       if (i + 1 === lineEnd || input.charCodeAt(i + 1) === 32) {
         // Comment
         lineIndex++
@@ -103,15 +110,12 @@ export const parse = <T = any>(input: string): T => {
         lineStart = pos
         continue
       }
-      // Otherwise, it's a key starting with #
     }
 
     // 3. Parse Key
-    // Key is [a-zA-Z0-9_-]+ or starts with #
     const keyStart = i
     while (i < lineEnd) {
       const code = input.charCodeAt(i)
-      // Check for space (32) or newline (shouldn't happen here)
       if (code === 32) break
       i++
     }
@@ -119,18 +123,14 @@ export const parse = <T = any>(input: string): T => {
     let key = input.slice(keyStart, i)
     let forceArray = false
 
-    // Check for @ prefix
-    if (key.startsWith('@')) {
+    // Check for [] prefix
+    if (key.startsWith('[]')) {
       forceArray = true
-      key = key.slice(1)
+      key = key.slice(2)
     }
 
     // Validate key (fast check)
     if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
-      // It might be that we didn't find a space and took the whole line, 
-      // or the key contains invalid chars.
-      // If the line was just "key", i would be lineEnd.
-      // If "key:", invalid.
       throw new ParseError(`Invalid key format: "${input.slice(keyStart, i)}"`, lineIndex, input.slice(lineStart, lineEnd))
     }
 
@@ -149,7 +149,7 @@ export const parse = <T = any>(input: string): T => {
     } else {
       const char = input.charCodeAt(i)
 
-      if (char === 91) {
+      if (char === 91) { // [
         let hasClosing = false
         let j = lineEnd - 1
         while (j > i) {
@@ -165,7 +165,7 @@ export const parse = <T = any>(input: string): T => {
           if (arrayContent.trim().length === 0) {
             value = []
           } else {
-            value = parseArrayItems(arrayContent, lineIndex, input.slice(lineStart, lineEnd))
+            value = parseArrayItems(arrayContent, parseValueWithOptions, lineIndex, input.slice(lineStart, lineEnd))
           }
           pos = lineEnd + 1
           lineIndex++
@@ -252,7 +252,6 @@ export const parse = <T = any>(input: string): T => {
                   if (blIndent >= blockIndent) {
                     blockLines.push(input.slice(arrayPos + blockIndent, blEnd))
                   } else {
-                    // Should not happen if valid block string logic, but just take what we have
                     blockLines.push(input.slice(m, blEnd))
                   }
                 }
@@ -277,15 +276,11 @@ export const parse = <T = any>(input: string): T => {
           }
 
           if (!foundClosing) {
-            // If we broke out of loop without finding closing, it's an error
-            // We need to be careful about where we left 'pos'
-            if (pos <= lineEnd) { // We didn't update pos yet
+            if (pos <= lineEnd) {
               throw new ParseError('Unclosed array: missing closing bracket "]"', lineIndex, input.slice(lineStart, lineEnd))
             }
           } else {
-            // We successfully parsed the array
-            // Now we need to parse the values in arrayItems
-            value = arrayItems.map(item => parseValue(item))
+            value = arrayItems.map(item => parseValueWithOptions(item, lineIndex, input.slice(lineStart, lineEnd)))
           }
         }
       } else if (char === 34 && input.charCodeAt(i + 1) === 34 && input.charCodeAt(i + 2) === 34) { // """
@@ -341,14 +336,10 @@ export const parse = <T = any>(input: string): T => {
           lineStart = pos
         }
         value = blockLines.join('\n')
-        // We have advanced pos, so we are ready for next iteration
-        // But we need to attach value first
       } else {
         // Simple value
-        // We need to handle quoted strings that might contain spaces
-        // Or unquoted strings
         const rest = input.slice(i, lineEnd).trim()
-        value = parseValue(rest)
+        value = parseValueWithOptions(rest, lineIndex, input.slice(lineStart, lineEnd))
 
         // Advance pointers
         pos = lineEnd + 1
@@ -358,7 +349,6 @@ export const parse = <T = any>(input: string): T => {
     }
 
     // 5. Attach to parent
-    // Adjust stack based on indent
     while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
       stack.pop()
     }
@@ -389,7 +379,7 @@ export const parse = <T = any>(input: string): T => {
   return createParsedConfig<T>(root as T)
 }
 
-const parseArrayItems = (token: string, lineNumber?: number, line?: string): NodeValue[] => {
+const parseArrayItems = (token: string, valueParser: (t: string, ln?: number, l?: string) => NodeValue, lineNumber?: number, line?: string): NodeValue[] => {
   const root: NodeValue[] = []
   const stack: NodeValue[][] = [root]
 
@@ -407,7 +397,7 @@ const parseArrayItems = (token: string, lineNumber?: number, line?: string): Nod
         // Check for pending value before [
         const pre = token.slice(start, i).trim()
         if (pre.length > 0) {
-          stack[stack.length - 1].push(parseValue(pre))
+          stack[stack.length - 1].push(valueParser(pre, lineNumber, line))
         }
 
         const newArr: NodeValue[] = []
@@ -418,7 +408,7 @@ const parseArrayItems = (token: string, lineNumber?: number, line?: string): Nod
         // Handle pending value
         const val = token.slice(start, i).trim()
         if (val.length > 0) {
-          stack[stack.length - 1].push(parseValue(val))
+          stack[stack.length - 1].push(valueParser(val, lineNumber, line))
         }
 
         if (stack.length === 1) {
@@ -430,7 +420,7 @@ const parseArrayItems = (token: string, lineNumber?: number, line?: string): Nod
         // Handle pending value
         const val = token.slice(start, i).trim()
         if (val.length > 0) {
-          stack[stack.length - 1].push(parseValue(val))
+          stack[stack.length - 1].push(valueParser(val, lineNumber, line))
         }
         start = i + 1
       } else if (char === 34 || char === 39) {
@@ -453,7 +443,7 @@ const parseArrayItems = (token: string, lineNumber?: number, line?: string): Nod
   // Handle end of string
   const val = token.slice(start).trim()
   if (val.length > 0) {
-    stack[stack.length - 1].push(parseValue(val))
+    stack[stack.length - 1].push(valueParser(val, lineNumber, line))
   }
 
   if (stack.length > 1) {
@@ -463,11 +453,58 @@ const parseArrayItems = (token: string, lineNumber?: number, line?: string): Nod
   return root
 }
 
-const parseValue = (token: string): NodeValue => {
+const parseValue = (token: string, options?: ParseOptions, lineNumber?: number, line?: string): NodeValue => {
   if (token === 'null') return null
   if (token === 'undefined') return undefined
   if (token === 'true') return true
   if (token === 'false') return false
+
+  // Handle Import
+  if (token.startsWith('@')) {
+    let isUnwrap = false
+    let importPath = token.slice(1)
+
+    // Check for double @ (@@)
+    if (importPath.startsWith('@')) {
+      isUnwrap = true
+      importPath = importPath.slice(1)
+    }
+
+    let cleanPath = importPath
+    // Remove quotes if present
+    if ((cleanPath.startsWith('"') && cleanPath.endsWith('"')) || (cleanPath.startsWith("'") && cleanPath.endsWith("'"))) {
+      cleanPath = cleanPath.slice(1, -1)
+    }
+
+    // Resolve path
+    const baseDir = options?.baseDir || process.cwd()
+    const absolutePath = path.resolve(baseDir, cleanPath)
+
+    try {
+      const fileContent = fs.readFileSync(absolutePath, 'utf-8')
+      // Recursively parse the imported file
+      const parsed = parse(fileContent, { baseDir: path.dirname(absolutePath) })
+
+      if (isUnwrap) {
+        // Check if it has exactly one key
+        const keys = Object.keys(parsed)
+        if (keys.length !== 1) {
+          throw new Error(`Imported file must have exactly one root key to use "@@" syntax, found ${keys.length} keys`)
+        }
+
+        const value = parsed[keys[0]]
+        if (!Array.isArray(value)) {
+          throw new Error(`Imported file's root key "${keys[0]}" must be an array to use "@@" syntax`)
+        }
+
+        return value
+      }
+
+      return parsed
+    } catch (error: any) {
+      throw new ParseError(`Failed to import file "${cleanPath}": ${error.message}`, lineNumber, line)
+    }
+  }
 
   const firstChar = token.charCodeAt(0)
 
@@ -506,4 +543,3 @@ const parseValue = (token: string): NodeValue => {
 
   return token
 }
-

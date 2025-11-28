@@ -841,4 +841,122 @@ statuses ["janky", 123, "jankier", 2025-11-19T22:01:34.567, null]
       expect(reparsed.statuses).toHaveLength(5)
     })
   })
+
+  describe('forced array syntax', () => {
+    test('parses forced array with [] prefix', () => {
+      interface ForcedArrayConfig {
+        items: string[]
+      }
+      const result = sg.parse<ForcedArrayConfig>('[]items "item1"')
+      expect(result.items).toEqual(['item1'])
+    })
+
+    test('parses forced array with multiple items using [] prefix', () => {
+      interface ForcedArrayConfig {
+        items: string[]
+      }
+      const result = sg.parse<ForcedArrayConfig>(`
+[]items "item1"
+items "item2"
+`)
+      expect(result.items).toEqual(['item1', 'item2'])
+    })
+  })
+
+  describe('imports', () => {
+    test('imports file content', () => {
+      const result = sg.parse('imported @"./history-items.sg"')
+      expect(result.imported).toBeDefined()
+      expect(result.imported.description).toBe("History items")
+    })
+
+    test('throws ParseError when imported file is missing', () => {
+      expect(() => {
+        sg.parse('imported @"./missing.sg"')
+      }).toThrow(ParseError)
+
+      try {
+        sg.parse('imported @"./missing.sg"')
+      } catch (error) {
+        expect(error).toBeInstanceOf(ParseError)
+        expect((error as ParseError).message).toContain('Failed to import file')
+        expect((error as ParseError).message).toContain('missing.sg')
+      }
+    })
+
+    test('throws ParseError when imported file has invalid syntax', () => {
+      // Create a temporary file with invalid syntax
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const tempFile = path.join(__dirname, 'invalid.sg')
+      fs.writeFileSync(tempFile, 'invalid@key "value"')
+
+      try {
+        expect(() => {
+          sg.parse(`imported @"${tempFile}"`)
+        }).toThrow(ParseError)
+      } finally {
+        fs.unlinkSync(tempFile)
+      }
+    })
+
+    test('unwraps single-key array with @@ syntax', () => {
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const tempFile = path.join(__dirname, 'items.sg')
+      fs.writeFileSync(tempFile, 'list ["a", "b"]')
+
+      try {
+        const result = sg.parse(`items @@"${tempFile}"`)
+        expect(result.items).toEqual(['a', 'b'])
+      } finally {
+        fs.unlinkSync(tempFile)
+      }
+    })
+
+    test('throws error when @@ used on file with multiple keys', () => {
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const tempFile = path.join(__dirname, 'multi.sg')
+      fs.writeFileSync(tempFile, `
+key1 ["a"]
+key2 ["b"]
+`)
+
+      try {
+        expect(() => {
+          sg.parse(`items @@"${tempFile}"`)
+        }).toThrow(ParseError)
+
+        try {
+          sg.parse(`items @@"${tempFile}"`)
+        } catch (e) {
+          expect((e as ParseError).message).toContain('exactly one root key')
+        }
+      } finally {
+        fs.unlinkSync(tempFile)
+      }
+    })
+
+    test('throws error when @@ used on file with non-array value', () => {
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const tempFile = path.join(__dirname, 'nonarray.sg')
+      fs.writeFileSync(tempFile, 'key "value"')
+
+      try {
+        expect(() => {
+          sg.parse(`items @@"${tempFile}"`)
+        }).toThrow(ParseError)
+
+        try {
+          sg.parse(`items @@"${tempFile}"`)
+        } catch (e) {
+          expect((e as ParseError).message).toContain('must be an array')
+        }
+      } finally {
+        fs.unlinkSync(tempFile)
+      }
+    })
+  })
 })

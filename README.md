@@ -85,6 +85,8 @@ console.log(parsed)
 - **Arrays** - Support for arrays with mixed types
 - **Comments** - Lines starting with `#` are ignored
 - **Repeated keys** - Automatically converted to arrays
+- **Forced Arrays** - Force a single item to be an array with `[]key` syntax
+- **File Imports** - Import other files with `@"path/to/file"` syntax
 - **Bidirectional conversion** - Convert objects back to Slimgym format with `slimgify()`
 - **High performance** - Optimized parser with excellent performance characteristics
 
@@ -361,6 +363,76 @@ item
 // }
 ```
 
+### Forced Arrays
+
+To force a single item to be an array, prefix the key with `[]`:
+
+```typescript
+import sg from 'slimgym'
+
+const config = sg.parse(`
+[]items 
+  id 1234
+  title "single item"
+`)
+// Result: { items: [{ id: 1234, title: "single item" }] }
+```
+
+### File Imports
+
+You can import other Slimgym files using the `@"path"` syntax:
+
+```typescript
+import sg from 'slimgym'
+
+// main.sg
+const config = sg.parse(`
+title "External items"
+items @"./items.sg"
+`)
+// Result: { title: "External items", items: [{ id: 1234, title: "single item" }] }
+```
+
+### Unwrapped Array Imports
+
+If an imported file contains exactly one root key which is an array, you can use the `@@` syntax to unwrap it and import just the array value:
+
+**items.sg**
+```slimgym
+list [
+  "Apple"
+  "Banana"
+]
+```
+
+**main.sg**
+```slimgym
+# Standard import - preserves structure
+# Result: { fruits: { list: ["Apple", "Banana"] } }
+fruits @"./items.sg"
+
+# Unwrapped import - ignores "list" key
+# Result: { fruits: ["Apple", "Banana"] }
+fruits @@"./items.sg"
+```
+
+
+### Error Handling
+
+If an imported file cannot be read or contains invalid syntax, a `ParseError` will be thrown. The error message will include the path of the file that failed to import and the reason for the failure.
+
+```typescript
+try {
+  sg.parse('items @"./missing.sg"')
+} catch (error) {
+  if (error instanceof sg.ParseError) {
+    console.error(error.message)
+    // Output: Failed to import file "missing.sg": ENOENT: no such file or directory...
+  }
+}
+```
+
+
 ### Complete Example
 
 ```typescript
@@ -568,12 +640,14 @@ console.log(sg.slimgify(withBlocks))
 
 ## API
 
-### `sg.parse<T = any>(input: string): T`
+### `sg.parse<T = any>(input: string, options?: ParseOptions): T`
 
 Parses a SlimGym configuration string and returns a JavaScript object with a `toJSON()` method. Supports TypeScript generics for type safety.
 
 **Parameters:**
 - `input` (string): The SlimGym configuration string to parse
+- `options` (object, optional):
+  - `baseDir` (string): Base directory for resolving file imports (defaults to `process.cwd()`)
 
 **Returns:**
 - `T`: A JavaScript object representing the parsed configuration (defaults to `any`). The returned object has a `toJSON()` method that converts Date objects to ISO strings.

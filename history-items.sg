@@ -1,0 +1,20 @@
+description "History items"
+items
+  item
+    id 1234
+    date 2025-11-19
+    customer
+      name "ACME Corp"
+      contact """
+        Jane Doe
+        +1 555 1234
+      """
+  item
+      id 1235
+      date 2025-11-20
+      customer
+      name "Shaggy Corp"
+      contact """
+          Shaggy Doe
+          +1 555 1234
+      """

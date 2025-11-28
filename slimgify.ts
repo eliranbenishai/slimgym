@@ -172,10 +172,10 @@ const slimgifyObject = (obj: any, buffer: string[], indent: string): void => {
       value.every((item: any) => typeof item === 'object' && item !== null && !Array.isArray(item) && !(item instanceof Date))
 
     if (isArrayOfObjects) {
-      // If single item, use @key syntax
+      // If single item, use []key syntax
       if (value.length === 1) {
         if (i > 0) buffer.push('\n')
-        buffer.push(indent, '@', key, '\n')
+        buffer.push(indent, '[]', key, '\n')
         slimgifyObject(value[0], buffer, `${indent}  `)
       } else {
         // Multiple items - repeated keys
