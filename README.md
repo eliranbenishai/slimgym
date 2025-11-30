@@ -90,60 +90,60 @@ console.log(parsed)
 - **Bidirectional conversion** - Convert objects back to Slimgym format with `slimgify()`
 - **High performance** - Optimized parser with excellent performance characteristics
 
-## Performance
+## Possible Use Cases
 
-SlimGym is designed for speed. The parser is optimized for real-world use cases and handles large files efficiently:
+SlimGym's clean syntax and feature set make it ideal for various applications:
 
-### Benchmark Results
+### Theming Templates
 
-All benchmarks run on a modern development machine. Times are in microseconds (μs).
+Define complex theme structures with nested properties for colors, typography, and spacing without the visual noise of JSON or YAML.
 
-| Test Case | Size | Parse Time |
-|-----------|------|------------|
-| Simple key-value pairs | 100 items | ~740 μs |
-| Deeply nested objects | 10 levels | ~50 μs |
-| Large inline arrays | 1,000 items | ~660 μs |
-| Multi-line arrays | 500 items | ~400 μs |
-| Large block strings | 10KB | ~20 μs |
-| Multiple block strings | 100 strings | ~175 μs |
-| Complex nested structure | 50 objects | ~360 μs |
-| Repeated keys | 200 repetitions | ~470 μs |
-| Mixed types | 500 values | ~1,270 μs |
-| Very large input | 50KB, 5,000 lines | ~6,000 μs |
-| Block strings with quotes | 50 strings | ~80 μs |
-| Nested arrays | 5 levels deep | ~44 μs |
-| Comments everywhere | 1,000 lines | ~840 μs |
-| **giant.sg file** | **100,000 lines, 6.0MB** | **~98ms** |
+```slimgym
+theme
+  colors
+    primary "#007bff"
+    secondary "#6c757d"
+  typography
+    fontFamily "Inter, sans-serif"
+    sizes
+      h1 "2.5rem"
+      body "1rem"
+```
 
-### Slimgify Performance
+### CMS Content Definition
 
-The `slimgify()` method is optimized for serialization performance:
+Use block strings and structured data to define content for static sites or CMS systems. The indentation makes the structure obvious and easy to edit for non-developers.
 
-| Test Case | Size | Slimgify Time |
-|-----------|------|---------------|
-| Simple key-value pairs | 100 items | ~200 μs |
-| Deeply nested objects | 10 levels | ~50 μs |
-| Large inline arrays | 1,000 items | ~300 μs |
-| Multi-line arrays | 500 items | ~250 μs |
-| Large block strings | 10KB | ~30 μs |
-| Multiple block strings | 100 strings | ~200 μs |
-| Complex nested structure | 50 objects | ~400 μs |
-| Arrays with repeated keys | 200 items | ~300 μs |
-| Mixed types | 500 values | ~500 μs |
-| Very large object | 5,000 keys | ~2,500 μs |
-| Block strings with quotes | 50 strings | ~150 μs |
-| Nested arrays | 5 levels deep | ~40 μs |
-| Round-trip (parse + slimgify) | 1,000 items | ~1,200 μs |
-| **giant.sg round-trip** | **100,000 lines, 6.0MB** | **~148ms** |
+```slimgym
+page
+  title "About Us"
+  slug "about"
+  content """
+    Welcome to our company.
+    We are dedicated to excellence.
+  """
+  meta
+    description "Learn more about our team"
+    keywords ["team", "company", "about"]
+```
 
-### Performance Highlights
+### Complex Configuration Setups
 
-- **100,000 lines (6.0MB) parsed in under 150ms** - Handles enterprise-scale configuration files with ease
-- **Sub-millisecond parsing** for typical use cases (hundreds to thousands of lines)
-- **Efficient memory usage** - Processes files without excessive memory allocation
-- **Optimized for common patterns** - Fast parsing of nested structures, arrays, and block strings
+Manage intricate application configurations with environments, feature flags, and service definitions.
 
-The parser uses optimized algorithms and avoids regex where possible for maximum performance.
+```slimgym
+server
+  env "production"
+  port 8080
+  logging
+    level "info"
+    format "json"
+  database
+    host "db.example.com"
+    pool
+      min 5
+      max 20
+```
 
 ## Examples
 
