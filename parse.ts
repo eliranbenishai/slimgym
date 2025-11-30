@@ -479,11 +479,11 @@ const parseValue = (token: string, options?: ParseOptions, lineNumber?: number, 
     }
 
     // Resolve path
-    const baseDir = options?.baseDir || process.cwd()
+    const baseDir = options?.baseDir ?? process.cwd()
     const absolutePath = path.resolve(baseDir, cleanPath)
 
     // Check for circular reference
-    if (options?._ancestors?.has(absolutePath)) {
+    if (options?._ancestors?.has(absolutePath) === true) {
       throw new ParseError(`Circular dependency detected: "${absolutePath}"`, lineNumber, line)
     }
 
@@ -491,7 +491,7 @@ const parseValue = (token: string, options?: ParseOptions, lineNumber?: number, 
       const fileContent = fs.readFileSync(absolutePath, 'utf-8')
 
       // Update ancestors for recursive call
-      const newAncestors = new Set(options?._ancestors || [])
+      const newAncestors = new Set(options?._ancestors ?? [])
       newAncestors.add(absolutePath)
 
       // Recursively parse the imported file
