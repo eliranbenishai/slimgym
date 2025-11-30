@@ -4,6 +4,8 @@ import { ParseError, type NodeObject, type NodeValue } from './types.js'
 
 export interface ParseOptions {
   baseDir?: string
+  /** @internal */
+  _ancestors?: Set<string>
 }
 
 const createParsedConfig = <T = any>(data: T): T => {
@@ -480,10 +482,23 @@ const parseValue = (token: string, options?: ParseOptions, lineNumber?: number, 
     const baseDir = options?.baseDir || process.cwd()
     const absolutePath = path.resolve(baseDir, cleanPath)
 
+    // Check for circular reference
+    if (options?._ancestors?.has(absolutePath)) {
+      throw new ParseError(`Circular dependency detected: "${absolutePath}"`, lineNumber, line)
+    }
+
     try {
       const fileContent = fs.readFileSync(absolutePath, 'utf-8')
+
+      // Update ancestors for recursive call
+      const newAncestors = new Set(options?._ancestors || [])
+      newAncestors.add(absolutePath)
+
       // Recursively parse the imported file
-      const parsed = parse(fileContent, { baseDir: path.dirname(absolutePath) })
+      const parsed = parse(fileContent, {
+        baseDir: path.dirname(absolutePath),
+        _ancestors: newAncestors
+      })
 
       if (isUnwrap) {
         // Check if it has exactly one key
@@ -502,6 +517,9 @@ const parseValue = (token: string, options?: ParseOptions, lineNumber?: number, 
 
       return parsed
     } catch (error: any) {
+      if (error instanceof ParseError) {
+        throw error
+      }
       throw new ParseError(`Failed to import file "${cleanPath}": ${error.message}`, lineNumber, line)
     }
   }
