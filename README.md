@@ -142,6 +142,9 @@ const config = sg.parse<MyConfig>(`name "App"`)
 
 **Options:**
 - `baseDir` - Base directory for `@` imports (default: `process.cwd()`)
+- `maxDepth` - Maximum nesting depth (default: 100, set to 0 to disable)
+- `maxArraySize` - Maximum array size (default: 10000, set to 0 to disable)
+- `maxImportDepth` - Maximum `@` import chain depth (default: 10, set to 0 to disable)
 
 ### `fetch<T>(filePath: string, options?): T`
 
@@ -149,10 +152,13 @@ Read and parse a SlimGym file synchronously.
 
 ```typescript
 const config = sg.fetch('./config.sg')
-const config = sg.fetch('config.sg', { baseDir: '/app' })
+const config = sg.fetch('config.sg', { baseDir: '/app', sandboxDir: '/app' })
 ```
 
-**Options:** `baseDir` - Base directory for relative paths (default: `process.cwd()`)
+**Options:**
+- `baseDir` - Base directory for relative paths (default: `process.cwd()`)
+- `sandboxDir` - Restrict file access to this directory (prevents path traversal)
+- `maxDepth`, `maxArraySize`, `maxImportDepth` - Same as `parse()`
 
 ### `fetchAsync<T>(filePath: string, options?): Promise<T>`
 
@@ -160,10 +166,10 @@ Read and parse a SlimGym file asynchronously.
 
 ```typescript
 const config = await sg.fetchAsync('./config.sg')
-const config = await sg.fetchAsync('config.sg', { baseDir: '/app' })
+const config = await sg.fetchAsync('config.sg', { baseDir: '/app', sandboxDir: '/app' })
 ```
 
-**Options:** `baseDir` - Base directory for relative paths (default: `process.cwd()`)
+**Options:** Same as `fetch()`
 
 ### `fetchUrl<T>(url: string, options?): Promise<T>`
 
@@ -171,11 +177,15 @@ Fetch and parse a SlimGym file from a URL using Node's native `fetch`.
 
 ```typescript
 const config = await sg.fetchUrl('https://example.com/config.sg')
+const config = await sg.fetchUrl('https://cdn.example.com/config.sg', {
+  allowedHosts: ['cdn.example.com']
+})
 ```
 
-**Options:** `baseUrl` - Base URL for resolving `@` imports within the content
-
-**Note:** Relative `@` imports in URL-fetched content resolve against the URL's base path.
+**Options:**
+- `baseUrl` - Base URL for resolving `@` imports within the content
+- `allowedHosts` - Restrict fetching to these hostnames (prevents SSRF)
+- `maxDepth`, `maxArraySize`, `maxImportDepth` - Same as `parse()`
 
 ### `slimgify(obj: any): string`
 
@@ -227,7 +237,7 @@ import { parse, fetch, fetchAsync, fetchUrl } from 'slimgym/parse'
 import { slimgify } from 'slimgym/slimgify'
 ```
 
-**Exported Types:** `NodeObject`, `NodeValue`, `Primitive`, `ParseError`, `FetchOptions`, `FetchUrlOptions`
+**Exported Types:** `NodeObject`, `NodeValue`, `Primitive`, `ParseError`, `ParseOptions`, `FetchOptions`, `FetchUrlOptions`
 
 ## Error Handling
 
@@ -243,6 +253,54 @@ try {
   }
 }
 ```
+
+## Security
+
+SlimGym includes built-in protections when handling untrusted input:
+
+### Prototype Pollution Protection
+
+Keys like `__proto__`, `constructor`, and `prototype` are automatically blocked:
+
+```typescript
+sg.parse('__proto__ "evil"')  // Throws ParseError
+```
+
+### Path Traversal Prevention
+
+Use `sandboxDir` to restrict file access:
+
+```typescript
+// Only allows access within /app/config
+sg.fetch('../../../etc/passwd', {
+  baseDir: '/app/config',
+  sandboxDir: '/app/config'  // Blocks escape attempts
+})
+```
+
+### SSRF Prevention
+
+Use `allowedHosts` to restrict URL fetching:
+
+```typescript
+await sg.fetchUrl('https://internal-api.local/config.sg', {
+  allowedHosts: ['cdn.example.com']  // Blocks - not in allowlist
+})
+```
+
+### DoS Protection
+
+Limits prevent resource exhaustion:
+
+```typescript
+sg.parse(maliciousInput, {
+  maxDepth: 50,        // Max nesting depth (default: 100)
+  maxArraySize: 1000,  // Max array items (default: 10000)
+  maxImportDepth: 5    // Max @import chain (default: 10)
+})
+```
+
+Set any limit to `0` or `Infinity` to disable it.
 
 ## Use Cases
 

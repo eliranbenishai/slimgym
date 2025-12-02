@@ -1272,4 +1272,254 @@ describe('fetchUrl', () => {
     // This URL should fail to fetch
     await expect(sg.fetchUrl('http://localhost:99999/nonexistent.sg')).rejects.toThrow(ParseError)
   })
+
+  test('throws ParseError when host is not in allowedHosts', async () => {
+    await expect(
+      sg.fetchUrl('https://malicious.com/config.sg', { allowedHosts: ['example.com'] })
+    ).rejects.toThrow(ParseError)
+
+    try {
+      await sg.fetchUrl('https://malicious.com/config.sg', { allowedHosts: ['example.com'] })
+    } catch (e) {
+      expect((e as ParseError).message).toContain('not in the allowed hosts list')
+    }
+  })
+})
+
+describe('security', () => {
+  describe('prototype pollution prevention', () => {
+    test('rejects __proto__ key', () => {
+      expect(() => {
+        sg.parse('__proto__ "polluted"')
+      }).toThrow(ParseError)
+
+      try {
+        sg.parse('__proto__ "polluted"')
+      } catch (e) {
+        expect((e as ParseError).message).toContain('Forbidden key')
+        expect((e as ParseError).message).toContain('prototype pollution')
+      }
+    })
+
+    test('rejects constructor key', () => {
+      expect(() => {
+        sg.parse('constructor "polluted"')
+      }).toThrow(ParseError)
+    })
+
+    test('rejects prototype key', () => {
+      expect(() => {
+        sg.parse('prototype "polluted"')
+      }).toThrow(ParseError)
+    })
+
+    test('rejects dangerous keys in nested objects', () => {
+      expect(() => {
+        sg.parse(`
+parent
+  __proto__ "polluted"
+`)
+      }).toThrow(ParseError)
+    })
+  })
+
+  describe('path traversal prevention', () => {
+    test('fetch blocks path traversal with sandboxDir', () => {
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const os = require('node:os')
+
+      const sandboxDir = path.join(os.tmpdir(), `sandbox-${Date.now()}`)
+      fs.mkdirSync(sandboxDir, { recursive: true })
+      const configFile = path.join(sandboxDir, 'config.sg')
+      fs.writeFileSync(configFile, 'name "test"')
+
+      try {
+        // This should work - file is inside sandbox
+        const result = sg.fetch('config.sg', { baseDir: sandboxDir, sandboxDir })
+        expect(result.name).toBe('test')
+
+        // This should fail - trying to escape sandbox
+        expect(() => {
+          sg.fetch('../../../etc/passwd', { baseDir: sandboxDir, sandboxDir })
+        }).toThrow(ParseError)
+
+        try {
+          sg.fetch('../../../etc/passwd', { baseDir: sandboxDir, sandboxDir })
+        } catch (e) {
+          expect((e as ParseError).message).toContain('Path traversal detected')
+        }
+      } finally {
+        fs.unlinkSync(configFile)
+        fs.rmdirSync(sandboxDir)
+      }
+    })
+
+    test('fetchAsync blocks path traversal with sandboxDir', async () => {
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const os = require('node:os')
+
+      const sandboxDir = path.join(os.tmpdir(), `sandbox-async-${Date.now()}`)
+      fs.mkdirSync(sandboxDir, { recursive: true })
+      const configFile = path.join(sandboxDir, 'config.sg')
+      fs.writeFileSync(configFile, 'name "async-test"')
+
+      try {
+        // This should work
+        const result = await sg.fetchAsync('config.sg', { baseDir: sandboxDir, sandboxDir })
+        expect(result.name).toBe('async-test')
+
+        // This should fail
+        await expect(
+          sg.fetchAsync('../../../etc/passwd', { baseDir: sandboxDir, sandboxDir })
+        ).rejects.toThrow(ParseError)
+      } finally {
+        fs.unlinkSync(configFile)
+        fs.rmdirSync(sandboxDir)
+      }
+    })
+
+    test('@ imports respect sandboxDir', () => {
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const os = require('node:os')
+
+      const sandboxDir = path.join(os.tmpdir(), `sandbox-import-${Date.now()}`)
+      fs.mkdirSync(sandboxDir, { recursive: true })
+      const mainFile = path.join(sandboxDir, 'main.sg')
+      const includedFile = path.join(sandboxDir, 'included.sg')
+
+      fs.writeFileSync(includedFile, 'included true')
+      fs.writeFileSync(mainFile, 'data @"../../../etc/passwd"')
+
+      try {
+        expect(() => {
+          sg.fetch('main.sg', { baseDir: sandboxDir, sandboxDir })
+        }).toThrow(ParseError)
+      } finally {
+        fs.unlinkSync(mainFile)
+        fs.unlinkSync(includedFile)
+        fs.rmdirSync(sandboxDir)
+      }
+    })
+  })
+
+  describe('DoS limits', () => {
+    test('enforces maxDepth limit', () => {
+      expect(() => {
+        sg.parse(`
+a
+  b
+    c
+      d
+        e "too deep"
+`, { maxDepth: 3 })
+      }).toThrow(ParseError)
+
+      try {
+        sg.parse(`
+a
+  b
+    c
+      d "too deep"
+`, { maxDepth: 3 })
+      } catch (e) {
+        expect((e as ParseError).message).toContain('Maximum nesting depth')
+      }
+    })
+
+    test('allows nesting within maxDepth limit', () => {
+      const result = sg.parse(`
+a
+  b
+    c "ok"
+`, { maxDepth: 5 })
+      expect(result.a.b.c).toBe('ok')
+    })
+
+    test('enforces maxArraySize limit', () => {
+      expect(() => {
+        sg.parse('items [1, 2, 3, 4, 5, 6]', { maxArraySize: 5 })
+      }).toThrow(ParseError)
+
+      try {
+        sg.parse('items [1, 2, 3, 4, 5, 6]', { maxArraySize: 5 })
+      } catch (e) {
+        expect((e as ParseError).message).toContain('Array exceeds maximum size')
+      }
+    })
+
+    test('allows arrays within maxArraySize limit', () => {
+      const result = sg.parse('items [1, 2, 3, 4, 5]', { maxArraySize: 5 })
+      expect(result.items).toEqual([1, 2, 3, 4, 5])
+    })
+
+    test('enforces maxArraySize on multi-line arrays', () => {
+      expect(() => {
+        sg.parse(`
+items [
+  1
+  2
+  3
+  4
+]
+`, { maxArraySize: 3 })
+      }).toThrow(ParseError)
+    })
+
+    test('enforces maxImportDepth limit', () => {
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const os = require('node:os')
+
+      const tempDir = path.join(os.tmpdir(), `import-depth-${Date.now()}`)
+      fs.mkdirSync(tempDir, { recursive: true })
+
+      // Create chain of imports: a -> b -> c -> d
+      fs.writeFileSync(path.join(tempDir, 'd.sg'), 'value "d"')
+      fs.writeFileSync(path.join(tempDir, 'c.sg'), 'c @"d.sg"')
+      fs.writeFileSync(path.join(tempDir, 'b.sg'), 'b @"c.sg"')
+      fs.writeFileSync(path.join(tempDir, 'a.sg'), 'a @"b.sg"')
+
+      try {
+        // Should fail with maxImportDepth of 2
+        expect(() => {
+          sg.fetch('a.sg', { baseDir: tempDir, maxImportDepth: 2 })
+        }).toThrow(ParseError)
+
+        // Should work with higher limit
+        const result = sg.fetch('a.sg', { baseDir: tempDir, maxImportDepth: 10 })
+        expect(result.a.b.c.value).toBe('d')
+      } finally {
+        fs.unlinkSync(path.join(tempDir, 'a.sg'))
+        fs.unlinkSync(path.join(tempDir, 'b.sg'))
+        fs.unlinkSync(path.join(tempDir, 'c.sg'))
+        fs.unlinkSync(path.join(tempDir, 'd.sg'))
+        fs.rmdirSync(tempDir)
+      }
+    })
+
+    test('disables limits when set to 0 or Infinity', () => {
+      // Deep nesting with limit disabled
+      const deepConfig = `
+a
+  b
+    c
+      d
+        e
+          f "deep"
+`
+      const result1 = sg.parse(deepConfig, { maxDepth: 0 })
+      expect(result1.a.b.c.d.e.f).toBe('deep')
+
+      const result2 = sg.parse(deepConfig, { maxDepth: Infinity })
+      expect(result2.a.b.c.d.e.f).toBe('deep')
+
+      // Large array with limit disabled
+      const largeArray = 'items [' + Array(100).fill('1').join(', ') + ']'
+      const result3 = sg.parse(largeArray, { maxArraySize: 0 })
+      expect(result3.items.length).toBe(100)
+    })
+  })
 })

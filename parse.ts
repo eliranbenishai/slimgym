@@ -3,10 +3,39 @@ import * as fsPromises from 'node:fs/promises'
 import * as path from 'node:path'
 import { ParseError, type NodeObject, type NodeValue } from './types.js'
 
+// Security: Keys that could cause prototype pollution
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
+// Default security limits
+const DEFAULT_MAX_DEPTH = 100
+const DEFAULT_MAX_ARRAY_SIZE = 10000
+const DEFAULT_MAX_IMPORT_DEPTH = 10
+
 export interface ParseOptions {
   baseDir?: string
+  /**
+   * Maximum nesting depth for objects. Defaults to 100.
+   * Set to 0 or Infinity to disable.
+   */
+  maxDepth?: number
+  /**
+   * Maximum number of items in an array. Defaults to 10000.
+   * Set to 0 or Infinity to disable.
+   */
+  maxArraySize?: number
+  /**
+   * Maximum depth of @import chains. Defaults to 10.
+   * Set to 0 or Infinity to disable.
+   */
+  maxImportDepth?: number
   /** @internal */
   _ancestors?: Set<string>
+  /** @internal */
+  _currentDepth?: number
+  /** @internal */
+  _importDepth?: number
+  /** @internal */
+  _sandboxDir?: string
 }
 
 export interface FetchOptions {
@@ -15,14 +44,80 @@ export interface FetchOptions {
    * Defaults to process.cwd() if not provided.
    */
   baseDir?: string
+  /**
+   * Restrict file access to this directory and its subdirectories.
+   * Prevents path traversal attacks. If not set, no restriction is applied.
+   */
+  sandboxDir?: string
+  /**
+   * Maximum nesting depth for objects. Defaults to 100.
+   */
+  maxDepth?: number
+  /**
+   * Maximum number of items in an array. Defaults to 10000.
+   */
+  maxArraySize?: number
+  /**
+   * Maximum depth of @import chains. Defaults to 10.
+   */
+  maxImportDepth?: number
 }
 
 export interface FetchUrlOptions {
   /**
    * Base URL for resolving relative imports within the fetched content.
-   * If not provided, relative @imports in the content will fail.
+   * If not provided, uses the URL's base path.
    */
   baseUrl?: string
+  /**
+   * List of allowed hostnames. If provided, only URLs matching these hosts are allowed.
+   * Prevents SSRF attacks.
+   * @example ['example.com', 'cdn.example.com']
+   */
+  allowedHosts?: string[]
+  /**
+   * Maximum nesting depth for objects. Defaults to 100.
+   */
+  maxDepth?: number
+  /**
+   * Maximum number of items in an array. Defaults to 10000.
+   */
+  maxArraySize?: number
+  /**
+   * Maximum depth of @import chains. Defaults to 10.
+   */
+  maxImportDepth?: number
+}
+
+/**
+ * Validates that a resolved path is within the allowed sandbox directory.
+ * Prevents path traversal attacks.
+ */
+const validatePathSandbox = (absolutePath: string, sandboxDir: string): void => {
+  const normalizedPath = path.normalize(absolutePath)
+  const normalizedSandbox = path.normalize(sandboxDir)
+  
+  if (!normalizedPath.startsWith(normalizedSandbox + path.sep) && normalizedPath !== normalizedSandbox) {
+    throw new ParseError(`Path traversal detected: "${absolutePath}" is outside sandbox "${sandboxDir}"`)
+  }
+}
+
+/**
+ * Validates that a URL's host is in the allowed list.
+ * Prevents SSRF attacks.
+ */
+const validateUrlHost = (url: string, allowedHosts: string[]): void => {
+  const parsedUrl = new URL(url)
+  const host = parsedUrl.hostname.toLowerCase()
+  
+  const isAllowed = allowedHosts.some(allowed => {
+    const normalizedAllowed = allowed.toLowerCase()
+    return host === normalizedAllowed || host.endsWith(`.${normalizedAllowed}`)
+  })
+  
+  if (!isAllowed) {
+    throw new ParseError(`Host "${host}" is not in the allowed hosts list`)
+  }
 }
 
 /**
@@ -44,13 +139,22 @@ export const fetch = <T = any>(filePath: string, options?: FetchOptions): T => {
     ? filePath
     : path.resolve(baseDir, filePath)
 
+  // Security: Validate path is within sandbox if specified
+  if (options?.sandboxDir != null && options.sandboxDir !== '') {
+    validatePathSandbox(absolutePath, options.sandboxDir)
+  }
+
   try {
     const fileContent = fs.readFileSync(absolutePath, 'utf-8')
 
     // Parse with baseDir set to the file's directory for proper relative import resolution
     return parse<T>(fileContent, {
       baseDir: path.dirname(absolutePath),
-    })
+      maxDepth: options?.maxDepth,
+      maxArraySize: options?.maxArraySize,
+      maxImportDepth: options?.maxImportDepth,
+      _sandboxDir: options?.sandboxDir,
+    } as ParseOptions & { _sandboxDir?: string })
   } catch (error: any) {
     if (error instanceof ParseError) {
       throw error
@@ -87,13 +191,22 @@ export const fetchAsync = async <T = any>(filePath: string, options?: FetchOptio
     ? filePath
     : path.resolve(baseDir, filePath)
 
+  // Security: Validate path is within sandbox if specified
+  if (options?.sandboxDir != null && options.sandboxDir !== '') {
+    validatePathSandbox(absolutePath, options.sandboxDir)
+  }
+
   try {
     const fileContent = await fsPromises.readFile(absolutePath, 'utf-8')
 
     // Parse with baseDir set to the file's directory for proper relative import resolution
     return parse<T>(fileContent, {
       baseDir: path.dirname(absolutePath),
-    })
+      maxDepth: options?.maxDepth,
+      maxArraySize: options?.maxArraySize,
+      maxImportDepth: options?.maxImportDepth,
+      _sandboxDir: options?.sandboxDir,
+    } as ParseOptions & { _sandboxDir?: string })
   } catch (error: any) {
     if (error instanceof ParseError) {
       throw error
@@ -124,6 +237,11 @@ export const fetchUrl = async <T = any>(url: string, options?: FetchUrlOptions):
     throw new ParseError('URL must be a non-empty string')
   }
 
+  // Security: Validate URL host if allowedHosts is specified
+  if (options?.allowedHosts && options.allowedHosts.length > 0) {
+    validateUrlHost(url, options.allowedHosts)
+  }
+
   try {
     const response = await globalThis.fetch(url)
 
@@ -139,6 +257,9 @@ export const fetchUrl = async <T = any>(url: string, options?: FetchUrlOptions):
 
     return parse<T>(content, {
       baseDir: baseUrl,
+      maxDepth: options?.maxDepth,
+      maxArraySize: options?.maxArraySize,
+      maxImportDepth: options?.maxImportDepth,
     })
   } catch (error: any) {
     if (error instanceof ParseError) {
@@ -204,6 +325,10 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
   if (typeof input !== 'string') {
     throw new ParseError('Input must be a string')
   }
+
+  // Security limits
+  const maxDepth = options?.maxDepth ?? DEFAULT_MAX_DEPTH
+  const maxArraySize = options?.maxArraySize ?? DEFAULT_MAX_ARRAY_SIZE
 
   const len = input.length
   let pos = 0
@@ -276,6 +401,11 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
       throw new ParseError(`Invalid key format: "${input.slice(keyStart, i)}"`, lineIndex, input.slice(lineStart, lineEnd))
     }
 
+    // Security: Block prototype pollution
+    if (DANGEROUS_KEYS.has(key)) {
+      throw new ParseError(`Forbidden key "${key}" (potential prototype pollution)`, lineIndex, input.slice(lineStart, lineEnd))
+    }
+
     // 4. Parse Value
     // Skip spaces after key
     while (i < lineEnd && input.charCodeAt(i) === 32) i++
@@ -307,7 +437,7 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
           if (arrayContent.trim().length === 0) {
             value = []
           } else {
-            value = parseArrayItems(arrayContent, parseValueWithOptions, lineIndex, input.slice(lineStart, lineEnd))
+            value = parseArrayItems(arrayContent, parseValueWithOptions, maxArraySize, lineIndex, input.slice(lineStart, lineEnd))
           }
           pos = lineEnd + 1
           lineIndex++
@@ -422,6 +552,10 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
               throw new ParseError('Unclosed array: missing closing bracket "]"', lineIndex, input.slice(lineStart, lineEnd))
             }
           } else {
+            // Security: Check array size limit
+            if (maxArraySize > 0 && maxArraySize !== Infinity && arrayItems.length > maxArraySize) {
+              throw new ParseError(`Array exceeds maximum size of ${maxArraySize}`, lineIndex, input.slice(lineStart, lineEnd))
+            }
             value = arrayItems.map(item => parseValueWithOptions(item, lineIndex, input.slice(lineStart, lineEnd)))
           }
         }
@@ -514,6 +648,10 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
 
     // If value is object, push to stack
     if (typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date)) {
+      // Security: Check depth limit
+      if (maxDepth > 0 && maxDepth !== Infinity && stack.length >= maxDepth) {
+        throw new ParseError(`Maximum nesting depth of ${maxDepth} exceeded`, lineIndex, input.slice(lineStart, lineEnd))
+      }
       stack.push({ indent, obj: value })
     }
   }
@@ -521,9 +659,16 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
   return createParsedConfig<T>(root as T)
 }
 
-const parseArrayItems = (token: string, valueParser: (t: string, ln?: number, l?: string) => NodeValue, lineNumber?: number, line?: string): NodeValue[] => {
+const parseArrayItems = (token: string, valueParser: (t: string, ln?: number, l?: string) => NodeValue, maxArraySize: number, lineNumber?: number, line?: string): NodeValue[] => {
   const root: NodeValue[] = []
   const stack: NodeValue[][] = [root]
+
+  // Helper to check array size
+  const checkArraySize = (arr: NodeValue[]): void => {
+    if (maxArraySize > 0 && maxArraySize !== Infinity && arr.length > maxArraySize) {
+      throw new ParseError(`Array exceeds maximum size of ${maxArraySize}`, lineNumber, line)
+    }
+  }
 
   let i = 0
   let start = 0
@@ -540,10 +685,12 @@ const parseArrayItems = (token: string, valueParser: (t: string, ln?: number, l?
         const pre = token.slice(start, i).trim()
         if (pre.length > 0) {
           stack[stack.length - 1].push(valueParser(pre, lineNumber, line))
+          checkArraySize(stack[stack.length - 1])
         }
 
         const newArr: NodeValue[] = []
         stack[stack.length - 1].push(newArr)
+        checkArraySize(stack[stack.length - 1])
         stack.push(newArr)
         start = i + 1
       } else if (char === 93) { // ]
@@ -551,6 +698,7 @@ const parseArrayItems = (token: string, valueParser: (t: string, ln?: number, l?
         const val = token.slice(start, i).trim()
         if (val.length > 0) {
           stack[stack.length - 1].push(valueParser(val, lineNumber, line))
+          checkArraySize(stack[stack.length - 1])
         }
 
         if (stack.length === 1) {
@@ -563,6 +711,7 @@ const parseArrayItems = (token: string, valueParser: (t: string, ln?: number, l?
         const val = token.slice(start, i).trim()
         if (val.length > 0) {
           stack[stack.length - 1].push(valueParser(val, lineNumber, line))
+          checkArraySize(stack[stack.length - 1])
         }
         start = i + 1
       } else if (char === 34 || char === 39) {
@@ -586,6 +735,7 @@ const parseArrayItems = (token: string, valueParser: (t: string, ln?: number, l?
   const val = token.slice(start).trim()
   if (val.length > 0) {
     stack[stack.length - 1].push(valueParser(val, lineNumber, line))
+    checkArraySize(stack[stack.length - 1])
   }
 
   if (stack.length > 1) {
@@ -603,6 +753,13 @@ const parseValue = (token: string, options?: ParseOptions, lineNumber?: number, 
 
   // Handle Import
   if (token.startsWith('@')) {
+    // Security: Check import depth limit
+    const maxImportDepth = options?.maxImportDepth ?? DEFAULT_MAX_IMPORT_DEPTH
+    const currentImportDepth = options?._importDepth ?? 0
+    if (maxImportDepth > 0 && maxImportDepth !== Infinity && currentImportDepth >= maxImportDepth) {
+      throw new ParseError(`Maximum import depth of ${maxImportDepth} exceeded`, lineNumber, line)
+    }
+
     let isUnwrap = false
     let importPath = token.slice(1)
 
@@ -622,6 +779,11 @@ const parseValue = (token: string, options?: ParseOptions, lineNumber?: number, 
     const baseDir = options?.baseDir ?? process.cwd()
     const absolutePath = path.resolve(baseDir, cleanPath)
 
+    // Security: Validate path is within sandbox if specified
+    if (options?._sandboxDir != null && options._sandboxDir !== '') {
+      validatePathSandbox(absolutePath, options._sandboxDir)
+    }
+
     // Check for circular reference
     if (options?._ancestors?.has(absolutePath) === true) {
       throw new ParseError(`Circular dependency detected: "${absolutePath}"`, lineNumber, line)
@@ -637,7 +799,12 @@ const parseValue = (token: string, options?: ParseOptions, lineNumber?: number, 
       // Recursively parse the imported file
       const parsed = parse(fileContent, {
         baseDir: path.dirname(absolutePath),
-        _ancestors: newAncestors
+        maxDepth: options?.maxDepth,
+        maxArraySize: options?.maxArraySize,
+        maxImportDepth: options?.maxImportDepth,
+        _ancestors: newAncestors,
+        _importDepth: currentImportDepth + 1,
+        _sandboxDir: options?._sandboxDir,
       })
 
       if (isUnwrap) {
