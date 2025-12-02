@@ -23,8 +23,12 @@ app
   tags ["web", "api"]
 `)
 
-// Or fetch from a file
+// Fetch from a file (sync or async)
 const config = sg.fetch('./config.sg')
+const config = await sg.fetchAsync('./config.sg')
+
+// Fetch from a URL
+const config = await sg.fetchUrl('https://example.com/config.sg')
 
 // Convert back to SlimGym format
 const str = sg.slimgify({ name: "MyApp", port: 8080 })
@@ -40,7 +44,7 @@ const str = sg.slimgify({ name: "MyApp", port: 8080 })
 - **Repeated keys** - Automatically converted to arrays
 - **Forced arrays** - `[]key` syntax for single-item arrays
 - **File imports** - `@"path"` and `@@"path"` syntax
-- **File fetching** - Read files directly with `fetch()`
+- **File fetching** - Read files with `fetch()`, `fetchAsync()`, or `fetchUrl()`
 - **Bidirectional** - Convert objects back with `slimgify()`
 
 ## Syntax Guide
@@ -141,20 +145,37 @@ const config = sg.parse<MyConfig>(`name "App"`)
 
 ### `fetch<T>(filePath: string, options?): T`
 
-Read and parse a SlimGym file. Supports relative and absolute paths.
+Read and parse a SlimGym file synchronously.
 
 ```typescript
-// Relative to cwd
 const config = sg.fetch('./config.sg')
-
-// With custom base directory
 const config = sg.fetch('config.sg', { baseDir: '/app' })
 ```
 
-**Options:**
-- `baseDir` - Base directory for relative paths (default: `process.cwd()`)
+**Options:** `baseDir` - Base directory for relative paths (default: `process.cwd()`)
 
-**Throws** `ParseError` if file not found or invalid syntax.
+### `fetchAsync<T>(filePath: string, options?): Promise<T>`
+
+Read and parse a SlimGym file asynchronously.
+
+```typescript
+const config = await sg.fetchAsync('./config.sg')
+const config = await sg.fetchAsync('config.sg', { baseDir: '/app' })
+```
+
+**Options:** `baseDir` - Base directory for relative paths (default: `process.cwd()`)
+
+### `fetchUrl<T>(url: string, options?): Promise<T>`
+
+Fetch and parse a SlimGym file from a URL using Node's native `fetch`.
+
+```typescript
+const config = await sg.fetchUrl('https://example.com/config.sg')
+```
+
+**Options:** `baseUrl` - Base URL for resolving `@` imports within the content
+
+**Note:** Relative `@` imports in URL-fetched content resolve against the URL's base path.
 
 ### `slimgify(obj: any): string`
 
@@ -193,6 +214,8 @@ interface Config {
 
 const config = sg.parse<Config>(`name "App"\nport 8080`)
 const config = sg.fetch<Config>('./config.sg')
+const config = await sg.fetchAsync<Config>('./config.sg')
+const config = await sg.fetchUrl<Config>('https://example.com/config.sg')
 ```
 
 ## Tree-Shaking
@@ -200,11 +223,11 @@ const config = sg.fetch<Config>('./config.sg')
 Import only what you need:
 
 ```typescript
-import { parse, fetch } from 'slimgym/parse'
+import { parse, fetch, fetchAsync, fetchUrl } from 'slimgym/parse'
 import { slimgify } from 'slimgym/slimgify'
 ```
 
-**Exported Types:** `NodeObject`, `NodeValue`, `Primitive`, `ParseError`, `FetchOptions`
+**Exported Types:** `NodeObject`, `NodeValue`, `Primitive`, `ParseError`, `FetchOptions`, `FetchUrlOptions`
 
 ## Error Handling
 

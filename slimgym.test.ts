@@ -1150,3 +1150,126 @@ invalid!key "value"
     })
   })
 })
+
+describe('fetchAsync', () => {
+  test('asynchronously fetches and parses a file', async () => {
+    const fs = require('node:fs')
+    const path = require('node:path')
+    const os = require('node:os')
+    const tempFile = path.join(os.tmpdir(), `test-fetch-async-${Date.now()}.sg`)
+    fs.writeFileSync(tempFile, `
+name "AsyncTest"
+value 42
+`)
+    try {
+      const result = await sg.fetchAsync(tempFile)
+      expect(result).toEqual({
+        name: 'AsyncTest',
+        value: 42,
+      })
+    } finally {
+      fs.unlinkSync(tempFile)
+    }
+  })
+
+  test('fetches with relative path and baseDir', async () => {
+    const fs = require('node:fs')
+    const path = require('node:path')
+    const os = require('node:os')
+    const tempDir = path.join(os.tmpdir(), `test-fetch-async-dir-${Date.now()}`)
+    fs.mkdirSync(tempDir, { recursive: true })
+    const tempFile = path.join(tempDir, 'async-config.sg')
+    fs.writeFileSync(tempFile, `
+async true
+port 3000
+`)
+    try {
+      const result = await sg.fetchAsync('async-config.sg', { baseDir: tempDir })
+      expect(result).toEqual({
+        async: true,
+        port: 3000,
+      })
+    } finally {
+      fs.unlinkSync(tempFile)
+      fs.rmdirSync(tempDir)
+    }
+  })
+
+  test('resolves nested imports correctly', async () => {
+    const fs = require('node:fs')
+    const path = require('node:path')
+    const os = require('node:os')
+    const tempDir = path.join(os.tmpdir(), `test-fetch-async-nested-${Date.now()}`)
+    fs.mkdirSync(tempDir, { recursive: true })
+
+    const mainFile = path.join(tempDir, 'main.sg')
+    const includeFile = path.join(tempDir, 'included.sg')
+
+    fs.writeFileSync(includeFile, `nested "value"`)
+    fs.writeFileSync(mainFile, `
+root "main"
+imported @"included.sg"
+`)
+    try {
+      const result = await sg.fetchAsync(mainFile)
+      expect(result).toEqual({
+        root: 'main',
+        imported: { nested: 'value' },
+      })
+    } finally {
+      fs.unlinkSync(mainFile)
+      fs.unlinkSync(includeFile)
+      fs.rmdirSync(tempDir)
+    }
+  })
+
+  test('throws ParseError for non-existent file', async () => {
+    await expect(sg.fetchAsync('/nonexistent/path/file.sg')).rejects.toThrow(ParseError)
+  })
+
+  test('throws ParseError for empty file path', async () => {
+    await expect(sg.fetchAsync('')).rejects.toThrow(ParseError)
+  })
+
+  test('supports TypeScript generics', async () => {
+    const fs = require('node:fs')
+    const path = require('node:path')
+    const os = require('node:os')
+    interface TypedConfig {
+      name: string
+      count: number
+    }
+    const tempFile = path.join(os.tmpdir(), `test-fetch-async-typed-${Date.now()}.sg`)
+    fs.writeFileSync(tempFile, `
+name "TypedAsync"
+count 100
+`)
+    try {
+      const result = await sg.fetchAsync<TypedConfig>(tempFile)
+      expect(result.name).toBe('TypedAsync')
+      expect(result.count).toBe(100)
+    } finally {
+      fs.unlinkSync(tempFile)
+    }
+  })
+})
+
+describe('fetchUrl', () => {
+  test('throws ParseError for empty URL', async () => {
+    await expect(sg.fetchUrl('')).rejects.toThrow(ParseError)
+  })
+
+  test('throws ParseError for whitespace-only URL', async () => {
+    await expect(sg.fetchUrl('   ')).rejects.toThrow(ParseError)
+  })
+
+  test('throws ParseError for invalid input type', async () => {
+    // @ts-expect-error Testing invalid input
+    await expect(sg.fetchUrl(123)).rejects.toThrow(ParseError)
+  })
+
+  test('throws ParseError for failed fetch', async () => {
+    // This URL should fail to fetch
+    await expect(sg.fetchUrl('http://localhost:99999/nonexistent.sg')).rejects.toThrow(ParseError)
+  })
+})

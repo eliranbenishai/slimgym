@@ -1,4 +1,5 @@
 import * as fs from 'node:fs'
+import * as fsPromises from 'node:fs/promises'
 import * as path from 'node:path'
 import { ParseError, type NodeObject, type NodeValue } from './types.js'
 
@@ -14,6 +15,14 @@ export interface FetchOptions {
    * Defaults to process.cwd() if not provided.
    */
   baseDir?: string
+}
+
+export interface FetchUrlOptions {
+  /**
+   * Base URL for resolving relative imports within the fetched content.
+   * If not provided, relative @imports in the content will fail.
+   */
+  baseUrl?: string
 }
 
 /**
@@ -56,6 +65,86 @@ export const fetch = <T = any>(filePath: string, options?: FetchOptions): T => {
       throw new ParseError(`Path is a directory, not a file: "${absolutePath}"`)
     }
     throw new ParseError(`Failed to read file "${absolutePath}": ${error.message}`)
+  }
+}
+
+/**
+ * Asynchronously reads and parses a SlimGym file from the filesystem.
+ * Supports both absolute and relative paths.
+ *
+ * @param filePath - The path to the file (can be relative or absolute)
+ * @param options - Options for resolving the file path
+ * @returns Promise resolving to the parsed content
+ * @throws ParseError if the file cannot be read or parsed
+ */
+export const fetchAsync = async <T = any>(filePath: string, options?: FetchOptions): Promise<T> => {
+  if (typeof filePath !== 'string' || filePath.trim() === '') {
+    throw new ParseError('File path must be a non-empty string')
+  }
+
+  const baseDir = options?.baseDir ?? process.cwd()
+  const absolutePath = path.isAbsolute(filePath)
+    ? filePath
+    : path.resolve(baseDir, filePath)
+
+  try {
+    const fileContent = await fsPromises.readFile(absolutePath, 'utf-8')
+
+    // Parse with baseDir set to the file's directory for proper relative import resolution
+    return parse<T>(fileContent, {
+      baseDir: path.dirname(absolutePath),
+    })
+  } catch (error: any) {
+    if (error instanceof ParseError) {
+      throw error
+    }
+    if (error.code === 'ENOENT') {
+      throw new ParseError(`File not found: "${absolutePath}"`)
+    }
+    if (error.code === 'EACCES') {
+      throw new ParseError(`Permission denied: "${absolutePath}"`)
+    }
+    if (error.code === 'EISDIR') {
+      throw new ParseError(`Path is a directory, not a file: "${absolutePath}"`)
+    }
+    throw new ParseError(`Failed to read file "${absolutePath}": ${error.message}`)
+  }
+}
+
+/**
+ * Fetches and parses a SlimGym file from a URL using Node's native fetch.
+ *
+ * @param url - The URL to fetch the SlimGym content from
+ * @param options - Options for parsing the content
+ * @returns Promise resolving to the parsed content
+ * @throws ParseError if the fetch fails or content is invalid
+ */
+export const fetchUrl = async <T = any>(url: string, options?: FetchUrlOptions): Promise<T> => {
+  if (typeof url !== 'string' || url.trim() === '') {
+    throw new ParseError('URL must be a non-empty string')
+  }
+
+  try {
+    const response = await globalThis.fetch(url)
+
+    if (!response.ok) {
+      throw new ParseError(`Failed to fetch "${url}": ${response.status} ${response.statusText}`)
+    }
+
+    const content = await response.text()
+
+    // If baseUrl is provided, use it for resolving relative imports
+    // Otherwise, use the URL's base path
+    const baseUrl = options?.baseUrl ?? new URL('.', url).href
+
+    return parse<T>(content, {
+      baseDir: baseUrl,
+    })
+  } catch (error: any) {
+    if (error instanceof ParseError) {
+      throw error
+    }
+    throw new ParseError(`Failed to fetch "${url}": ${error.message}`)
   }
 }
 
