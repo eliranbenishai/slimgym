@@ -960,3 +960,193 @@ key2 ["b"]
     })
   })
 })
+
+describe('fetch', () => {
+  describe('basic file fetching', () => {
+    test('fetches and parses a file with absolute path', () => {
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const os = require('node:os')
+      const tempFile = path.join(os.tmpdir(), `test-fetch-${Date.now()}.sg`)
+      fs.writeFileSync(tempFile, `
+name "John"
+age 30
+active true
+`)
+      try {
+        const result = sg.fetch(tempFile)
+        expect(result).toEqual({
+          name: 'John',
+          age: 30,
+          active: true,
+        })
+      } finally {
+        fs.unlinkSync(tempFile)
+      }
+    })
+
+    test('fetches and parses a file with relative path using baseDir', () => {
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const os = require('node:os')
+      const tempDir = path.join(os.tmpdir(), `test-fetch-dir-${Date.now()}`)
+      fs.mkdirSync(tempDir, { recursive: true })
+      const tempFile = path.join(tempDir, 'config.sg')
+      fs.writeFileSync(tempFile, `
+database
+  host "localhost"
+  port 5432
+`)
+      try {
+        const result = sg.fetch('config.sg', { baseDir: tempDir })
+        expect(result).toEqual({
+          database: {
+            host: 'localhost',
+            port: 5432,
+          },
+        })
+      } finally {
+        fs.unlinkSync(tempFile)
+        fs.rmdirSync(tempDir)
+      }
+    })
+
+    test('fetches nested files with proper relative import resolution', () => {
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const os = require('node:os')
+      const tempDir = path.join(os.tmpdir(), `test-fetch-nested-${Date.now()}`)
+      const subDir = path.join(tempDir, 'configs')
+      fs.mkdirSync(subDir, { recursive: true })
+
+      const mainFile = path.join(tempDir, 'main.sg')
+      const includeFile = path.join(subDir, 'included.sg')
+
+      fs.writeFileSync(includeFile, `
+setting "from included"
+value 42
+`)
+      fs.writeFileSync(mainFile, `
+app
+  name "MyApp"
+  config @"configs/included.sg"
+`)
+      try {
+        const result = sg.fetch(mainFile)
+        expect(result).toEqual({
+          app: {
+            name: 'MyApp',
+            config: {
+              setting: 'from included',
+              value: 42,
+            },
+          },
+        })
+      } finally {
+        fs.unlinkSync(mainFile)
+        fs.unlinkSync(includeFile)
+        fs.rmdirSync(subDir)
+        fs.rmdirSync(tempDir)
+      }
+    })
+
+    test('supports generic type parameter', () => {
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const os = require('node:os')
+      interface AppConfig {
+        name: string
+        version: number
+      }
+      const tempFile = path.join(os.tmpdir(), `test-fetch-typed-${Date.now()}.sg`)
+      fs.writeFileSync(tempFile, `
+name "MyApp"
+version 1
+`)
+      try {
+        const result = sg.fetch<AppConfig>(tempFile)
+        expect(result.name).toBe('MyApp')
+        expect(result.version).toBe(1)
+      } finally {
+        fs.unlinkSync(tempFile)
+      }
+    })
+  })
+
+  describe('error handling', () => {
+    test('throws ParseError for non-existent file', () => {
+      expect(() => {
+        sg.fetch('/nonexistent/path/file.sg')
+      }).toThrow(ParseError)
+
+      try {
+        sg.fetch('/nonexistent/path/file.sg')
+      } catch (e) {
+        expect((e as ParseError).message).toContain('File not found')
+      }
+    })
+
+    test('throws ParseError for empty file path', () => {
+      expect(() => {
+        sg.fetch('')
+      }).toThrow(ParseError)
+
+      try {
+        sg.fetch('')
+      } catch (e) {
+        expect((e as ParseError).message).toContain('non-empty string')
+      }
+    })
+
+    test('throws ParseError for whitespace-only file path', () => {
+      expect(() => {
+        sg.fetch('   ')
+      }).toThrow(ParseError)
+
+      try {
+        sg.fetch('   ')
+      } catch (e) {
+        expect((e as ParseError).message).toContain('non-empty string')
+      }
+    })
+
+    test('throws ParseError for invalid input type', () => {
+      expect(() => {
+        // @ts-expect-error Testing invalid input
+        sg.fetch(123)
+      }).toThrow(ParseError)
+    })
+
+    test('propagates parse errors from file content', () => {
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const os = require('node:os')
+      const tempFile = path.join(os.tmpdir(), `test-fetch-invalid-${Date.now()}.sg`)
+      fs.writeFileSync(tempFile, `
+invalid!key "value"
+`)
+      try {
+        expect(() => {
+          sg.fetch(tempFile)
+        }).toThrow(ParseError)
+      } finally {
+        fs.unlinkSync(tempFile)
+      }
+    })
+
+    test('throws ParseError when path is a directory', () => {
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const os = require('node:os')
+      const tempDir = path.join(os.tmpdir(), `test-fetch-isdir-${Date.now()}`)
+      fs.mkdirSync(tempDir, { recursive: true })
+      try {
+        expect(() => {
+          sg.fetch(tempDir)
+        }).toThrow(ParseError)
+      } finally {
+        fs.rmdirSync(tempDir)
+      }
+    })
+  })
+})

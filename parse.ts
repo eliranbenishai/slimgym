@@ -8,6 +8,57 @@ export interface ParseOptions {
   _ancestors?: Set<string>
 }
 
+export interface FetchOptions {
+  /**
+   * Base directory for resolving relative paths.
+   * Defaults to process.cwd() if not provided.
+   */
+  baseDir?: string
+}
+
+/**
+ * Reads and parses a SlimGym file from the filesystem.
+ * Supports both absolute and relative paths.
+ *
+ * @param filePath - The path to the file (can be relative or absolute)
+ * @param options - Options for resolving the file path
+ * @returns The parsed content
+ * @throws ParseError if the file cannot be read or parsed
+ */
+export const fetch = <T = any>(filePath: string, options?: FetchOptions): T => {
+  if (typeof filePath !== 'string' || filePath.trim() === '') {
+    throw new ParseError('File path must be a non-empty string')
+  }
+
+  const baseDir = options?.baseDir ?? process.cwd()
+  const absolutePath = path.isAbsolute(filePath)
+    ? filePath
+    : path.resolve(baseDir, filePath)
+
+  try {
+    const fileContent = fs.readFileSync(absolutePath, 'utf-8')
+
+    // Parse with baseDir set to the file's directory for proper relative import resolution
+    return parse<T>(fileContent, {
+      baseDir: path.dirname(absolutePath),
+    })
+  } catch (error: any) {
+    if (error instanceof ParseError) {
+      throw error
+    }
+    if (error.code === 'ENOENT') {
+      throw new ParseError(`File not found: "${absolutePath}"`)
+    }
+    if (error.code === 'EACCES') {
+      throw new ParseError(`Permission denied: "${absolutePath}"`)
+    }
+    if (error.code === 'EISDIR') {
+      throw new ParseError(`Path is a directory, not a file: "${absolutePath}"`)
+    }
+    throw new ParseError(`Failed to read file "${absolutePath}": ${error.message}`)
+  }
+}
+
 const createParsedConfig = <T = any>(data: T): T => {
   const convertToJSON = (value: any): any => {
     if (value instanceof Date) {
