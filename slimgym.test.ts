@@ -1313,6 +1313,21 @@ describe('security', () => {
       }).toThrow(ParseError)
     })
 
+    test('rejects toJSON key to protect serializer', () => {
+      expect(() => {
+        sg.parse('toJSON "malicious"')
+      }).toThrow(ParseError)
+    })
+
+    test('rejects toJSON key in nested objects', () => {
+      expect(() => {
+        sg.parse(`
+parent
+  toJSON "malicious"
+`)
+      }).toThrow(ParseError)
+    })
+
     test('rejects dangerous keys in nested objects', () => {
       expect(() => {
         sg.parse(`

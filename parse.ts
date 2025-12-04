@@ -3,8 +3,24 @@ import * as fsPromises from 'node:fs/promises'
 import * as path from 'node:path'
 import { ParseError, type NodeObject, type NodeValue } from './types.js'
 
-// Security: Keys that could cause prototype pollution
-const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+// Security: Keys that could cause prototype pollution or override built-ins
+const DANGEROUS_KEYS = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+  // Object.prototype methods (prevent overriding runtime behavior)
+  'hasOwnProperty',
+  'isPrototypeOf',
+  'propertyIsEnumerable',
+  'toLocaleString',
+  'toString',
+  'toJSON',
+  'valueOf',
+  '__defineGetter__',
+  '__defineSetter__',
+  '__lookupGetter__',
+  '__lookupSetter__',
+])
 
 // Default security limits
 const DEFAULT_MAX_DEPTH = 100
