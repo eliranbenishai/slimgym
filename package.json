@@ -27,21 +27,20 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "prepublishOnly": "pnpm run build",
-    "publish:unversioned": "pnpm run build && pnpm publish --no-git-checks",
-    "publish:patch": "pnpm version patch && pnpm publish --no-git-checks",
-    "publish:minor": "pnpm version minor && pnpm publish --no-git-checks",
-    "publish:major": "pnpm version major && pnpm publish --no-git-checks",
-    "test": "vitest run",
-    "test:ui": "vitest --ui",
-    "test:watch": "vitest",
-    "test:coverage": "vitest --coverage",
-    "test:stress": "vitest run slimgym.stress.test.ts"
+    "build": "bun run tsc",
+    "lint": "bun run eslint .",
+    "lint:fix": "bun run eslint . --fix",
+    "prepublishOnly": "bun run build",
+    "publish:unversioned": "bun run build && npm publish --no-git-checks",
+    "publish:patch": "npm version patch && npm publish --no-git-checks",
+    "publish:minor": "npm version minor && npm publish --no-git-checks",
+    "publish:major": "npm version major && npm publish --no-git-checks",
+    "test": "bun run vitest run",
+    "test:ui": "bun run vitest --ui",
+    "test:watch": "bun run vitest",
+    "test:coverage": "bun run vitest --coverage",
+    "test:stress": "bun run vitest run slimgym.stress.test.ts"
   },
-  "packageManager": "pnpm@10.0.0",
   "keywords": [
     "config",
     "parser",
@@ -63,7 +62,7 @@
   "homepage": "https://slimgym.dev",
   "devDependencies": {
     "@eslint/js": "^9.0.0",
-    "@types/node": "^24.10.1",
+    "@types/bun": "latest",
     "@vitest/ui": "^4.0.0",
     "eslint": "^9.0.0",
     "jiti": "^2.6.1",
@@ -72,7 +71,6 @@
     "vitest": "^4.0.0"
   },
   "engines": {
-    "node": ">=22.0.0",
-    "pnpm": ">=10.0.0"
+    "bun": ">=1.0.0"
   }
 }

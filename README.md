@@ -4,10 +4,14 @@ An indentation-based configuration format that combines clean syntax with modern
 
 ## Installation
 
+Works with both Bun and Node.js (v18+):
+
 ```bash
-pnpm add slimgym
+bun add slimgym
 # or
 npm install slimgym
+# or
+pnpm add slimgym
 ```
 
 ## Quick Start
@@ -312,11 +316,42 @@ Set any limit to `0` or `Infinity` to disable it.
 
 ## Development
 
+This project uses Bun for development:
+
 ```bash
-pnpm install    # Install dependencies
-pnpm run build  # Build the project
-pnpm test       # Run tests
+bun install    # Install dependencies
+bun run build  # Build the project
+bun test       # Run tests
 ```
+
+### Using Node.js
+
+The published package is fully compatible with Node.js (v18+). Install with your preferred package manager:
+
+```bash
+npm install slimgym
+# or
+yarn add slimgym
+# or
+pnpm add slimgym
+```
+
+**No runtime differences** — the package uses standard Node.js APIs (`node:fs`, `node:path`) that work identically in both Bun and Node.js. All features, including `fetch()`, `fetchAsync()`, `fetchUrl()`, and `parse()`, behave the same regardless of runtime.
+
+If you want to contribute or run the test suite locally with Node.js instead of Bun:
+
+```bash
+# Install dependencies (using npm/pnpm/yarn)
+npm install
+
+# Build (requires tsc from devDependencies)
+npm run build
+
+# Run tests (requires vitest from devDependencies)
+npx vitest run
+```
+
+> **Note:** The lockfile (`bun.lockb`) is Bun-specific. When using npm/pnpm/yarn, a new lockfile will be generated for your package manager.
 
 ## License
 
