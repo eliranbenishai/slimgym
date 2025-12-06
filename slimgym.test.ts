@@ -596,6 +596,177 @@ tags ["a", "b"]
       expect(json.tags).toEqual(['a', 'b'])
     })
   })
+
+  describe('clone', () => {
+    test('creates a deep copy of simple objects', () => {
+      const result = sg.parse(`
+name "John"
+age 30
+active true
+`)
+      const cloned = result.clone()
+      expect(cloned).toEqual({ name: 'John', age: 30, active: true })
+      expect(cloned).not.toBe(result)
+    })
+
+    test('creates a deep copy of nested objects', () => {
+      const result = sg.parse(`
+user
+  name "John"
+  address
+    city "NYC"
+    zip 10001
+`)
+      const cloned = result.clone()
+      expect(cloned).toEqual({
+        user: {
+          name: 'John',
+          address: { city: 'NYC', zip: 10001 },
+        },
+      })
+      // Verify deep independence
+      expect(cloned.user).not.toBe(result.user)
+      expect(cloned.user.address).not.toBe(result.user.address)
+    })
+
+    test('creates a deep copy of arrays', () => {
+      const result = sg.parse(`
+items ["a", "b", "c"]
+numbers [1, 2, 3]
+`)
+      const cloned = result.clone()
+      expect(cloned).toEqual({ items: ['a', 'b', 'c'], numbers: [1, 2, 3] })
+      expect(cloned.items).not.toBe(result.items)
+      expect(cloned.numbers).not.toBe(result.numbers)
+    })
+
+    test('creates a deep copy of nested arrays', () => {
+      const result = sg.parse(`
+matrix [[1, 2], [3, 4]]
+`)
+      const cloned = result.clone()
+      expect(cloned.matrix).toEqual([[1, 2], [3, 4]])
+      expect(cloned.matrix).not.toBe(result.matrix)
+      expect(cloned.matrix[0]).not.toBe(result.matrix[0])
+      expect(cloned.matrix[1]).not.toBe(result.matrix[1])
+    })
+
+    test('clones Date objects correctly', () => {
+      const result = sg.parse(`
+date 2025-11-19T10:30:00Z
+`)
+      const cloned = result.clone()
+      expect(cloned.date).toBeInstanceOf(Date)
+      expect(cloned.date.getTime()).toBe(result.date.getTime())
+      expect(cloned.date).not.toBe(result.date)
+    })
+
+    test('clones nested Date objects', () => {
+      const result = sg.parse(`
+event
+  start 2025-06-15T09:00:00Z
+  end 2025-06-17T18:00:00Z
+`)
+      const cloned = result.clone()
+      expect(cloned.event.start).toBeInstanceOf(Date)
+      expect(cloned.event.end).toBeInstanceOf(Date)
+      expect(cloned.event.start).not.toBe(result.event.start)
+      expect(cloned.event.end).not.toBe(result.event.end)
+    })
+
+    test('clones Date objects in arrays', () => {
+      const result = sg.parse(`
+dates [2025-11-19T10:30:00Z, 2025-12-25T00:00:00Z]
+`)
+      const cloned = result.clone()
+      expect(cloned.dates[0]).toBeInstanceOf(Date)
+      expect(cloned.dates[1]).toBeInstanceOf(Date)
+      expect(cloned.dates[0]).not.toBe(result.dates[0])
+      expect(cloned.dates[1]).not.toBe(result.dates[1])
+    })
+
+    test('handles null and undefined values', () => {
+      const result = sg.parse(`
+nullVal null
+undefVal undefined
+`)
+      const cloned = result.clone()
+      expect(cloned.nullVal).toBe(null)
+      expect(cloned.undefVal).toBe(undefined)
+    })
+
+    test('modifications to clone do not affect original', () => {
+      const result = sg.parse(`
+user
+  name "John"
+  tags ["a", "b"]
+`)
+      const cloned = result.clone()
+
+      // Modify the clone
+      cloned.user.name = 'Jane'
+      cloned.user.tags.push('c')
+
+      // Original should be unchanged
+      expect(result.user.name).toBe('John')
+      expect(result.user.tags).toEqual(['a', 'b'])
+    })
+
+    test('modifications to original do not affect clone', () => {
+      const result = sg.parse(`
+user
+  name "John"
+  tags ["a", "b"]
+`)
+      const cloned = result.clone()
+
+      // Modify the original
+      result.user.name = 'Jane'
+      result.user.tags.push('c')
+
+      // Clone should be unchanged
+      expect(cloned.user.name).toBe('John')
+      expect(cloned.user.tags).toEqual(['a', 'b'])
+    })
+
+    test('handles complex nested structures', () => {
+      const result = sg.parse(`
+app
+  name "MyApp"
+  settings
+    theme "dark"
+    notifications
+      email true
+      sms false
+  users [
+    "alice"
+    "bob"
+  ]
+`)
+      const cloned = result.clone()
+      expect(cloned).toEqual({
+        app: {
+          name: 'MyApp',
+          settings: {
+            theme: 'dark',
+            notifications: { email: true, sms: false },
+          },
+          users: ['alice', 'bob'],
+        },
+      })
+      // Verify deep independence
+      expect(cloned.app).not.toBe(result.app)
+      expect(cloned.app.settings).not.toBe(result.app.settings)
+      expect(cloned.app.settings.notifications).not.toBe(result.app.settings.notifications)
+      expect(cloned.app.users).not.toBe(result.app.users)
+    })
+
+    test('clone method is non-enumerable', () => {
+      const result = sg.parse(`name "John"`)
+      expect(Object.keys(result)).toEqual(['name'])
+      expect('clone' in result).toBe(true)
+    })
+  })
 })
 
 describe('slimgify', () => {

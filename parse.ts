@@ -305,17 +305,85 @@ const createParsedConfig = <T = any>(data: T): T => {
     return value
   }
 
+  // High-performance deep clone using iterative approach with stack
+  const deepClone = (value: any): any => {
+    // Fast path for primitives
+    if (value === null || value === undefined) return value
+    const type = typeof value
+    if (type !== 'object') return value
+
+    // Date special case
+    if (value instanceof Date) {
+      return new Date(value.getTime())
+    }
+
+    // Use iterative approach with explicit stack for better performance
+    const root = Array.isArray(value) ? [] : {}
+    const stack: Array<{ src: any; dst: any; keys: string[]; idx: number }> = [{
+      src: value,
+      dst: root,
+      keys: Object.keys(value),
+      idx: 0,
+    }]
+
+    while (stack.length > 0) {
+      const frame = stack[stack.length - 1]
+
+      if (frame.idx >= frame.keys.length) {
+        stack.pop()
+        continue
+      }
+
+      const key = frame.keys[frame.idx++]
+      const srcVal = frame.src[key]
+
+      // Fast path for primitives (null, undefined, string, number, boolean)
+      if (srcVal === null || srcVal === undefined) {
+        frame.dst[key] = srcVal
+        continue
+      }
+
+      const valType = typeof srcVal
+      if (valType !== 'object') {
+        frame.dst[key] = srcVal
+        continue
+      }
+
+      // Date
+      if (srcVal instanceof Date) {
+        frame.dst[key] = new Date(srcVal.getTime())
+        continue
+      }
+
+      // Array or Object - push new frame
+      const cloned = Array.isArray(srcVal) ? [] : {}
+      frame.dst[key] = cloned
+      stack.push({
+        src: srcVal,
+        dst: cloned,
+        keys: Object.keys(srcVal),
+        idx: 0,
+      })
+    }
+
+    return root
+  }
+
   const toJSON = (): any => convertToJSON(data)
+  const clone = (): T => deepClone(data)
 
   return new Proxy(data as any, {
     get: (target, prop) => {
       if (prop === 'toJSON') {
         return toJSON
       }
+      if (prop === 'clone') {
+        return clone
+      }
       return target[prop as keyof typeof target]
     },
     has: (target, prop) => {
-      if (prop === 'toJSON') {
+      if (prop === 'toJSON' || prop === 'clone') {
         return true
       }
       return prop in target
@@ -329,6 +397,14 @@ const createParsedConfig = <T = any>(data: T): T => {
           enumerable: false,
           configurable: true,
           value: toJSON,
+          writable: false,
+        }
+      }
+      if (prop === 'clone') {
+        return {
+          enumerable: false,
+          configurable: true,
+          value: clone,
           writable: false,
         }
       }

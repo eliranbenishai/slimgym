@@ -216,6 +216,29 @@ config.date          // Date object
 config.toJSON().date // "2025-06-15T09:00:00.000Z"
 ```
 
+### `clone()`
+
+Parsed objects include a `clone()` method that creates a deep, completely decoupled copy:
+
+```typescript
+const config = sg.parse(`
+user
+  name "John"
+  tags ["admin", "active"]
+`)
+
+const copy = config.clone()
+
+// Modifications to the clone don't affect the original
+copy.user.name = "Jane"
+copy.user.tags.push("new")
+
+config.user.name  // "John" (unchanged)
+config.user.tags  // ["admin", "active"] (unchanged)
+```
+
+The clone method is optimized for performance using an iterative algorithm that avoids recursion overhead. Date objects are properly cloned as new Date instances.
+
 ## TypeScript
 
 All methods support generics for type safety:
