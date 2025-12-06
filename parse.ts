@@ -319,7 +319,7 @@ const createParsedConfig = <T = any>(data: T): T => {
 
     // Use iterative approach with explicit stack for better performance
     const root = Array.isArray(value) ? [] : {}
-    const stack: Array<{ src: any; dst: any; keys: string[]; idx: number }> = [{
+    const stack: { src: any; dst: any; keys: string[]; idx: number }[] = [{
       src: value,
       dst: root,
       keys: Object.keys(value),
