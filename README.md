@@ -206,19 +206,9 @@ const str = sg.slimgify({
 
 Multi-line strings automatically become block strings. Large arrays use multi-line format.
 
-### `toJSON()`
+### `$clone()`
 
-Parsed objects include a `toJSON()` method that converts Date objects to ISO strings:
-
-```typescript
-const config = sg.parse(`date 2025-06-15T09:00:00Z`)
-config.date          // Date object
-config.toJSON().date // "2025-06-15T09:00:00.000Z"
-```
-
-### `clone()`
-
-Parsed objects include a `clone()` method that creates a deep, completely decoupled copy:
+Parsed objects include a `$clone()` method that creates a deep, completely decoupled copy:
 
 ```typescript
 const config = sg.parse(`
@@ -227,7 +217,7 @@ user
   tags ["admin", "active"]
 `)
 
-const copy = config.clone()
+const copy = config.$clone()
 
 // Modifications to the clone don't affect the original
 copy.user.name = "Jane"
@@ -237,7 +227,9 @@ config.user.name  // "John" (unchanged)
 config.user.tags  // ["admin", "active"] (unchanged)
 ```
 
-The clone method is optimized for performance using an iterative algorithm that avoids recursion overhead. Date objects are properly cloned as new Date instances.
+The `$clone` method is optimized for performance using an iterative algorithm that avoids recursion overhead. Date objects are properly cloned as new Date instances.
+
+> **Note:** Method names use a `$` prefix (e.g., `$clone`) because `$` is not a valid character in SlimGym keys. This guarantees that library methods will never conflict with your data keys.
 
 ## TypeScript
 

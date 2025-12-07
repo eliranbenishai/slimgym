@@ -546,65 +546,14 @@ offset 2025-11-19T10:30:00+05:00
     })
   })
 
-  describe('toJSON', () => {
-    test('converts Date objects to ISO strings', () => {
-      const result = sg.parse(`
-date 2025-11-19T10:30:00Z
-`)
-      expect(result.date).toBeInstanceOf(Date)
-      const json = result.toJSON()
-      expect(json.date).toBe('2025-11-19T10:30:00.000Z')
-      expect(typeof json.date).toBe('string')
-    })
-
-    test('converts nested Date objects to ISO strings', () => {
-      const result = sg.parse(`
-event
-  startDate 2025-06-15T09:00:00Z
-  endDate 2025-06-17T18:00:00Z
-`)
-      expect(result.event.startDate).toBeInstanceOf(Date)
-      const json = result.toJSON()
-      expect(json.event.startDate).toBe('2025-06-15T09:00:00.000Z')
-      expect(json.event.endDate).toBe('2025-06-17T18:00:00.000Z')
-    })
-
-    test('converts Date objects in arrays to ISO strings', () => {
-      const result = sg.parse(`
-dates [
-  2025-11-19T10:30:00Z
-  2025-12-25T00:00:00Z
-]
-`)
-      expect(result.dates[0]).toBeInstanceOf(Date)
-      const json = result.toJSON()
-      expect(json.dates[0]).toBe('2025-11-19T10:30:00.000Z')
-      expect(json.dates[1]).toBe('2025-12-25T00:00:00.000Z')
-    })
-
-    test('preserves other types unchanged', () => {
-      const result = sg.parse(`
-name "John"
-age 30
-active true
-tags ["a", "b"]
-`)
-      const json = result.toJSON()
-      expect(json.name).toBe('John')
-      expect(json.age).toBe(30)
-      expect(json.active).toBe(true)
-      expect(json.tags).toEqual(['a', 'b'])
-    })
-  })
-
-  describe('clone', () => {
+  describe('$clone', () => {
     test('creates a deep copy of simple objects', () => {
       const result = sg.parse(`
 name "John"
 age 30
 active true
 `)
-      const cloned = result.clone()
+      const cloned = result.$clone()
       expect(cloned).toEqual({ name: 'John', age: 30, active: true })
       expect(cloned).not.toBe(result)
     })
@@ -617,7 +566,7 @@ user
     city "NYC"
     zip 10001
 `)
-      const cloned = result.clone()
+      const cloned = result.$clone()
       expect(cloned).toEqual({
         user: {
           name: 'John',
@@ -634,7 +583,7 @@ user
 items ["a", "b", "c"]
 numbers [1, 2, 3]
 `)
-      const cloned = result.clone()
+      const cloned = result.$clone()
       expect(cloned).toEqual({ items: ['a', 'b', 'c'], numbers: [1, 2, 3] })
       expect(cloned.items).not.toBe(result.items)
       expect(cloned.numbers).not.toBe(result.numbers)
@@ -644,7 +593,7 @@ numbers [1, 2, 3]
       const result = sg.parse(`
 matrix [[1, 2], [3, 4]]
 `)
-      const cloned = result.clone()
+      const cloned = result.$clone()
       expect(cloned.matrix).toEqual([[1, 2], [3, 4]])
       expect(cloned.matrix).not.toBe(result.matrix)
       expect(cloned.matrix[0]).not.toBe(result.matrix[0])
@@ -655,7 +604,7 @@ matrix [[1, 2], [3, 4]]
       const result = sg.parse(`
 date 2025-11-19T10:30:00Z
 `)
-      const cloned = result.clone()
+      const cloned = result.$clone()
       expect(cloned.date).toBeInstanceOf(Date)
       expect(cloned.date.getTime()).toBe(result.date.getTime())
       expect(cloned.date).not.toBe(result.date)
@@ -667,7 +616,7 @@ event
   start 2025-06-15T09:00:00Z
   end 2025-06-17T18:00:00Z
 `)
-      const cloned = result.clone()
+      const cloned = result.$clone()
       expect(cloned.event.start).toBeInstanceOf(Date)
       expect(cloned.event.end).toBeInstanceOf(Date)
       expect(cloned.event.start).not.toBe(result.event.start)
@@ -678,7 +627,7 @@ event
       const result = sg.parse(`
 dates [2025-11-19T10:30:00Z, 2025-12-25T00:00:00Z]
 `)
-      const cloned = result.clone()
+      const cloned = result.$clone()
       expect(cloned.dates[0]).toBeInstanceOf(Date)
       expect(cloned.dates[1]).toBeInstanceOf(Date)
       expect(cloned.dates[0]).not.toBe(result.dates[0])
@@ -690,7 +639,7 @@ dates [2025-11-19T10:30:00Z, 2025-12-25T00:00:00Z]
 nullVal null
 undefVal undefined
 `)
-      const cloned = result.clone()
+      const cloned = result.$clone()
       expect(cloned.nullVal).toBe(null)
       expect(cloned.undefVal).toBe(undefined)
     })
@@ -701,7 +650,7 @@ user
   name "John"
   tags ["a", "b"]
 `)
-      const cloned = result.clone()
+      const cloned = result.$clone()
 
       // Modify the clone
       cloned.user.name = 'Jane'
@@ -718,7 +667,7 @@ user
   name "John"
   tags ["a", "b"]
 `)
-      const cloned = result.clone()
+      const cloned = result.$clone()
 
       // Modify the original
       result.user.name = 'Jane'
@@ -743,7 +692,7 @@ app
     "bob"
   ]
 `)
-      const cloned = result.clone()
+      const cloned = result.$clone()
       expect(cloned).toEqual({
         app: {
           name: 'MyApp',
@@ -761,10 +710,10 @@ app
       expect(cloned.app.users).not.toBe(result.app.users)
     })
 
-    test('clone method is non-enumerable', () => {
+    test('$clone method is non-enumerable', () => {
       const result = sg.parse(`name "John"`)
       expect(Object.keys(result)).toEqual(['name'])
-      expect('clone' in result).toBe(true)
+      expect('$clone' in result).toBe(true)
     })
   })
 })
@@ -1481,21 +1430,6 @@ describe('security', () => {
     test('rejects prototype key', () => {
       expect(() => {
         sg.parse('prototype "polluted"')
-      }).toThrow(ParseError)
-    })
-
-    test('rejects toJSON key to protect serializer', () => {
-      expect(() => {
-        sg.parse('toJSON "malicious"')
-      }).toThrow(ParseError)
-    })
-
-    test('rejects toJSON key in nested objects', () => {
-      expect(() => {
-        sg.parse(`
-parent
-  toJSON "malicious"
-`)
       }).toThrow(ParseError)
     })
 

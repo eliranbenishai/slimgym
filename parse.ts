@@ -14,7 +14,6 @@ const DANGEROUS_KEYS = new Set([
   'propertyIsEnumerable',
   'toLocaleString',
   'toString',
-  'toJSON',
   'valueOf',
   '__defineGetter__',
   '__defineSetter__',
@@ -286,25 +285,6 @@ export const fetchUrl = async <T = any>(url: string, options?: FetchUrlOptions):
 }
 
 const createParsedConfig = <T = any>(data: T): T => {
-  const convertToJSON = (value: any): any => {
-    if (value instanceof Date) {
-      return value.toISOString()
-    }
-    if (Array.isArray(value)) {
-      return value.map(convertToJSON)
-    }
-    if (typeof value === 'object' && value !== null && !(value instanceof Date)) {
-      const result: any = {}
-      for (const key in value) {
-        if (Object.prototype.hasOwnProperty.call(value, key)) {
-          result[key] = convertToJSON(value[key])
-        }
-      }
-      return result
-    }
-    return value
-  }
-
   // High-performance deep clone using iterative approach with stack
   const deepClone = (value: any): any => {
     // Fast path for primitives
@@ -369,21 +349,17 @@ const createParsedConfig = <T = any>(data: T): T => {
     return root
   }
 
-  const toJSON = (): any => convertToJSON(data)
-  const clone = (): T => deepClone(data)
+  const $clone = (): T => deepClone(data)
 
   return new Proxy(data as any, {
     get: (target, prop) => {
-      if (prop === 'toJSON') {
-        return toJSON
-      }
-      if (prop === 'clone') {
-        return clone
+      if (prop === '$clone') {
+        return $clone
       }
       return target[prop as keyof typeof target]
     },
     has: (target, prop) => {
-      if (prop === 'toJSON' || prop === 'clone') {
+      if (prop === '$clone') {
         return true
       }
       return prop in target
@@ -392,19 +368,11 @@ const createParsedConfig = <T = any>(data: T): T => {
       return Object.keys(target)
     },
     getOwnPropertyDescriptor: (target, prop) => {
-      if (prop === 'toJSON') {
+      if (prop === '$clone') {
         return {
           enumerable: false,
           configurable: true,
-          value: toJSON,
-          writable: false,
-        }
-      }
-      if (prop === 'clone') {
-        return {
-          enumerable: false,
-          configurable: true,
-          value: clone,
+          value: $clone,
           writable: false,
         }
       }
