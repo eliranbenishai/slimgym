@@ -436,6 +436,34 @@ const createParsedConfig = <T = any>(data: T): T => {
 
   const $clone = (): T => deepClone(data)
 
+  // Recursively freeze an object to make it fully readonly
+  const deepFreeze = (obj: any): any => {
+    if (obj === null || typeof obj !== 'object') return obj
+    if (Object.isFrozen(obj)) return obj
+
+    // Freeze arrays
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        deepFreeze(item)
+      }
+      return Object.freeze(obj)
+    }
+
+    // Freeze object properties first, then the object itself
+    for (const key of Object.keys(obj)) {
+      const value = obj[key]
+      if (value !== null && typeof value === 'object') {
+        deepFreeze(value)
+      }
+    }
+    return Object.freeze(obj)
+  }
+
+  const $freeze = (): T => {
+    deepFreeze(data)
+    return data
+  }
+
   return new Proxy(data as any, {
     get: (target, prop) => {
       if (prop === '$find') {
@@ -444,10 +472,13 @@ const createParsedConfig = <T = any>(data: T): T => {
       if (prop === '$clone') {
         return $clone
       }
+      if (prop === '$freeze') {
+        return $freeze
+      }
       return target[prop as keyof typeof target]
     },
     has: (target, prop) => {
-      if (prop === '$find' || prop === '$clone') {
+      if (prop === '$find' || prop === '$clone' || prop === '$freeze') {
         return true
       }
       return prop in target
@@ -469,6 +500,14 @@ const createParsedConfig = <T = any>(data: T): T => {
           enumerable: false,
           configurable: true,
           value: $clone,
+          writable: false,
+        }
+      }
+      if (prop === '$freeze') {
+        return {
+          enumerable: false,
+          configurable: true,
+          value: $freeze,
           writable: false,
         }
       }

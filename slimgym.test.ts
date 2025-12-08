@@ -854,6 +854,122 @@ config
       expect('$find' in result).toBe(true)
     })
   })
+
+  describe('$freeze', () => {
+    test('freezes simple objects', () => {
+      const result = sg.parse(`
+name "John"
+age 30
+`)
+      result.$freeze()
+      expect(Object.isFrozen(result)).toBe(true)
+    })
+
+    test('freezes nested objects', () => {
+      const result = sg.parse(`
+user
+  name "John"
+  address
+    city "NYC"
+`)
+      result.$freeze()
+      expect(Object.isFrozen(result)).toBe(true)
+      expect(Object.isFrozen(result.user)).toBe(true)
+      expect(Object.isFrozen(result.user.address)).toBe(true)
+    })
+
+    test('freezes arrays', () => {
+      const result = sg.parse(`
+items ["a", "b", "c"]
+`)
+      result.$freeze()
+      expect(Object.isFrozen(result)).toBe(true)
+      expect(Object.isFrozen(result.items)).toBe(true)
+    })
+
+    test('freezes nested arrays and objects within arrays', () => {
+      const result = sg.parse(`
+users
+  user
+    name "Alice"
+  user
+    name "Bob"
+`)
+      result.$freeze()
+      expect(Object.isFrozen(result)).toBe(true)
+      expect(Object.isFrozen(result.users)).toBe(true)
+      expect(Object.isFrozen(result.users.user)).toBe(true)
+      expect(Object.isFrozen(result.users.user[0])).toBe(true)
+      expect(Object.isFrozen(result.users.user[1])).toBe(true)
+    })
+
+    test('prevents modifications after lock', () => {
+      const result = sg.parse(`
+name "John"
+age 30
+`)
+      result.$freeze()
+
+      // In strict mode, these would throw. In non-strict, they silently fail.
+      expect(() => {
+        'use strict'
+        result.name = 'Jane'
+      }).toThrow()
+    })
+
+    test('prevents adding new properties after lock', () => {
+      const result = sg.parse(`name "John"`)
+      result.$freeze()
+
+      expect(() => {
+        'use strict'
+        result.newProp = 'value'
+      }).toThrow()
+    })
+
+    test('prevents modifications to nested objects after lock', () => {
+      const result = sg.parse(`
+user
+  name "John"
+`)
+      result.$freeze()
+
+      expect(() => {
+        'use strict'
+        result.user.name = 'Jane'
+      }).toThrow()
+    })
+
+    test('prevents array modifications after lock', () => {
+      const result = sg.parse(`items ["a", "b"]`)
+      result.$freeze()
+
+      expect(() => {
+        'use strict'
+        result.items.push('c')
+      }).toThrow()
+    })
+
+    test('returns the locked object for chaining', () => {
+      const result = sg.parse(`name "John"`)
+      const locked = result.$freeze()
+      expect(locked).toEqual({ name: 'John' })
+      expect(Object.isFrozen(locked)).toBe(true)
+    })
+
+    test('$freeze method is non-enumerable', () => {
+      const result = sg.parse(`name "John"`)
+      expect(Object.keys(result)).toEqual(['name'])
+      expect('$freeze' in result).toBe(true)
+    })
+
+    test('can be called multiple times safely', () => {
+      const result = sg.parse(`name "John"`)
+      result.$freeze()
+      result.$freeze() // Should not throw
+      expect(Object.isFrozen(result)).toBe(true)
+    })
+  })
 })
 
 describe('slimgify', () => {

@@ -267,7 +267,26 @@ config.user.tags  // ["admin", "active"] (unchanged)
 
 The `$clone` method is optimized for performance using an iterative algorithm that avoids recursion overhead. Date objects are properly cloned as new Date instances.
 
-> **Note:** Method names use a `$` prefix (e.g., `$find`, `$clone`) because `$` is not a valid character in SlimGym keys. This guarantees that library methods will never conflict with your data keys.
+### `$freeze()`
+
+Make the parsed object fully immutable by recursively freezing it:
+
+```typescript
+const config = sg.parse(`
+user
+  name "John"
+  tags ["admin", "active"]
+`)
+
+config.$freeze()
+
+config.user.name = "Jane"     // Throws in strict mode, silently fails otherwise
+config.user.tags.push("new")  // Throws in strict mode
+```
+
+The `$freeze` method recursively applies `Object.freeze()` to the entire object tree, including nested objects and arrays. Returns the locked object for chaining.
+
+> **Note:** Method names use a `$` prefix (e.g., `$find`, `$clone`, `$freeze`) because `$` is not a valid character in SlimGym keys. This guarantees that library methods will never conflict with your data keys.
 
 ## TypeScript
 
