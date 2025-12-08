@@ -855,6 +855,134 @@ config
     })
   })
 
+  describe('$findAll', () => {
+    test('finds all matching keys at root level', () => {
+      const result = sg.parse(`
+firstName "John"
+lastName "Doe"
+middleName "James"
+`)
+      const matches = result.$findAll('*Name')
+      expect(matches).toHaveLength(3)
+      expect(matches).toContainEqual({ key: 'firstName', value: 'John' })
+      expect(matches).toContainEqual({ key: 'lastName', value: 'Doe' })
+      expect(matches).toContainEqual({ key: 'middleName', value: 'James' })
+    })
+
+    test('finds all matching keys at any depth', () => {
+      const result = sg.parse(`
+user1
+  firstName "Alice"
+user2
+  firstName "Bob"
+`)
+      const matches = result.$findAll('*Name')
+      expect(matches).toHaveLength(2)
+      expect(matches).toContainEqual({ key: 'user1.firstName', value: 'Alice' })
+      expect(matches).toContainEqual({ key: 'user2.firstName', value: 'Bob' })
+    })
+
+    test('returns full path for deeply nested matches', () => {
+      const result = sg.parse(`
+company
+  department
+    team
+      memberName "John"
+`)
+      const matches = result.$findAll('*Name')
+      expect(matches).toHaveLength(1)
+      expect(matches[0]).toEqual({ key: 'company.department.team.memberName', value: 'John' })
+    })
+
+    test('finds exact nested path', () => {
+      const result = sg.parse(`
+user
+  name "John"
+  profile
+    name "Johnny"
+`)
+      const matches = result.$findAll('user.name')
+      expect(matches).toHaveLength(1)
+      expect(matches[0]).toEqual({ key: 'user.name', value: 'John' })
+    })
+
+    test('finds all with wildcard in path', () => {
+      const result = sg.parse(`
+user
+  personalInfo
+    firstName "John"
+    lastName "Doe"
+  workInfo
+    jobName "Developer"
+`)
+      const matches = result.$findAll('user.*.*Name')
+      expect(matches).toHaveLength(3)
+      expect(matches).toContainEqual({ key: 'user.personalInfo.firstName', value: 'John' })
+      expect(matches).toContainEqual({ key: 'user.personalInfo.lastName', value: 'Doe' })
+      expect(matches).toContainEqual({ key: 'user.workInfo.jobName', value: 'Developer' })
+    })
+
+    test('returns empty array when no matches', () => {
+      const result = sg.parse(`
+firstName "John"
+lastName "Doe"
+`)
+      const matches = result.$findAll('*Email')
+      expect(matches).toEqual([])
+    })
+
+    test('respects depth option', () => {
+      const result = sg.parse(`
+level1
+  firstName "Shallow"
+  level2
+    firstName "Deep"
+`)
+      const shallow = result.$findAll('*Name', { depth: 2 })
+      expect(shallow).toHaveLength(1)
+      expect(shallow[0].value).toBe('Shallow')
+
+      const deep = result.$findAll('*Name', { depth: 4 })
+      expect(deep).toHaveLength(2)
+    })
+
+    test('searches inside arrays with index in path', () => {
+      const result = sg.parse(`
+users
+  user
+    name "Alice"
+  user
+    name "Bob"
+`)
+      const matches = result.$findAll('users.user.name')
+      expect(matches).toHaveLength(2)
+      expect(matches[0].key).toBe('users.user.0.name')
+      expect(matches[0].value).toBe('Alice')
+      expect(matches[1].key).toBe('users.user.1.name')
+      expect(matches[1].value).toBe('Bob')
+    })
+
+    test('handles wildcard matching any key', () => {
+      const result = sg.parse(`
+config
+  db
+    host "localhost"
+  cache
+    host "redis"
+`)
+      const matches = result.$findAll('config.*.host')
+      expect(matches).toHaveLength(2)
+      expect(matches).toContainEqual({ key: 'config.db.host', value: 'localhost' })
+      expect(matches).toContainEqual({ key: 'config.cache.host', value: 'redis' })
+    })
+
+    test('$findAll method is non-enumerable', () => {
+      const result = sg.parse(`name "John"`)
+      expect(Object.keys(result)).toEqual(['name'])
+      expect('$findAll' in result).toBe(true)
+    })
+  })
+
   describe('$freeze', () => {
     test('freezes simple objects', () => {
       const result = sg.parse(`

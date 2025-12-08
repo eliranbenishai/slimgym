@@ -370,6 +370,71 @@ const createParsedConfig = <T = any>(data: T): T => {
     return findMatch(data, 0, 0)
   }
 
+  interface FindResult {
+    key: string
+    value: any
+  }
+
+  const $findAll = (query: string, options?: FindOptions): FindResult[] => {
+    const maxDepth = options?.depth ?? Infinity
+    const segments = query.split('.')
+    const results: FindResult[] = []
+
+    const findAllMatches = (
+      obj: any,
+      segmentIndex: number,
+      currentDepth: number,
+      pathParts: string[]
+    ): void => {
+      // Base case: depth exceeded
+      if (currentDepth > maxDepth) return
+
+      // All segments matched - add to results
+      if (segmentIndex >= segments.length) {
+        results.push({ key: pathParts.join('.'), value: obj })
+        return
+      }
+
+      // Base cases for continuing the search
+      if (obj === null || typeof obj !== 'object') return
+
+      const pattern = segments[segmentIndex]
+
+      // Handle arrays - search each element
+      if (Array.isArray(obj)) {
+        for (let i = 0; i < obj.length; i++) {
+          findAllMatches(obj[i], segmentIndex, currentDepth, [...pathParts, String(i)])
+        }
+        return
+      }
+
+      if (hasWildcard(pattern)) {
+        // Search current level first
+        for (const key of Object.keys(obj)) {
+          if (matchPattern(key, pattern)) {
+            findAllMatches(obj[key], segmentIndex + 1, currentDepth + 1, [...pathParts, key])
+          }
+        }
+
+        // Then search deeper (wildcard patterns search at any depth)
+        for (const key of Object.keys(obj)) {
+          const child = obj[key]
+          if (child !== null && typeof child === 'object') {
+            findAllMatches(child, segmentIndex, currentDepth + 1, [...pathParts, key])
+          }
+        }
+      } else {
+        // Exact match at current level only
+        if (Object.prototype.hasOwnProperty.call(obj, pattern)) {
+          findAllMatches(obj[pattern], segmentIndex + 1, currentDepth + 1, [...pathParts, pattern])
+        }
+      }
+    }
+
+    findAllMatches(data, 0, 0, [])
+    return results
+  }
+
   // High-performance deep clone using iterative approach with stack
   const deepClone = (value: any): any => {
     // Fast path for primitives
@@ -469,6 +534,9 @@ const createParsedConfig = <T = any>(data: T): T => {
       if (prop === '$find') {
         return $find
       }
+      if (prop === '$findAll') {
+        return $findAll
+      }
       if (prop === '$clone') {
         return $clone
       }
@@ -478,7 +546,7 @@ const createParsedConfig = <T = any>(data: T): T => {
       return target[prop as keyof typeof target]
     },
     has: (target, prop) => {
-      if (prop === '$find' || prop === '$clone' || prop === '$freeze') {
+      if (prop === '$find' || prop === '$findAll' || prop === '$clone' || prop === '$freeze') {
         return true
       }
       return prop in target
@@ -492,6 +560,14 @@ const createParsedConfig = <T = any>(data: T): T => {
           enumerable: false,
           configurable: true,
           value: $find,
+          writable: false,
+        }
+      }
+      if (prop === '$findAll') {
+        return {
+          enumerable: false,
+          configurable: true,
+          value: $findAll,
           writable: false,
         }
       }

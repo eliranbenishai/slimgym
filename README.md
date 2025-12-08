@@ -244,6 +244,29 @@ config.$find('user.*.firstName')             // "John"
 config.$find('*Name', { depth: 2 }) // Only search 2 levels deep
 ```
 
+### `$findAll(query, options?)`
+
+Like `$find`, but returns **all** matches as an array of `{ key, value }` objects:
+
+```typescript
+const config = sg.parse(`
+user1
+  firstName "Alice"
+user2
+  firstName "Bob"
+`)
+
+config.$findAll('*Name')
+// [
+//   { key: 'user1.firstName', value: 'Alice' },
+//   { key: 'user2.firstName', value: 'Bob' }
+// ]
+```
+
+The `key` field contains the full path to the match, including array indices when searching through arrays.
+
+**Options:** Same as `$find` — use `depth` to limit search depth.
+
 ### `$clone()`
 
 Parsed objects include a `$clone()` method that creates a deep, completely decoupled copy:
@@ -286,7 +309,7 @@ config.user.tags.push("new")  // Throws in strict mode
 
 The `$freeze` method recursively applies `Object.freeze()` to the entire object tree, including nested objects and arrays. Returns the locked object for chaining.
 
-> **Note:** Method names use a `$` prefix (e.g., `$find`, `$clone`, `$freeze`) because `$` is not a valid character in SlimGym keys. This guarantees that library methods will never conflict with your data keys.
+> **Note:** Method names use a `$` prefix (e.g., `$find`, `$findAll`, `$clone`, `$freeze`) because `$` is not a valid character in SlimGym keys. This guarantees that library methods will never conflict with your data keys.
 
 ## TypeScript
 
