@@ -1,4 +1,4 @@
-export { parse, fetch, fetchAsync, fetchUrl, type ParseOptions, type FetchOptions, type FetchUrlOptions } from './parse.js'
+export { parse, fetch, fetchAsync, fetchUrl, type ParseOptions, type FetchOptions, type FetchUrlOptions, type FindOptions } from './parse.js'
 export { slimgify } from './slimgify.js'
 export { ParseError, type NodeObject, type NodeValue, type Primitive } from './types.js'
 

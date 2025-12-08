@@ -716,6 +716,144 @@ app
       expect('$clone' in result).toBe(true)
     })
   })
+
+  describe('$find', () => {
+    test('finds exact key at root level', () => {
+      const result = sg.parse(`
+name "John"
+age 30
+`)
+      expect(result.$find('name')).toBe('John')
+      expect(result.$find('age')).toBe(30)
+    })
+
+    test('finds exact nested path', () => {
+      const result = sg.parse(`
+user
+  name "John"
+  address
+    city "NYC"
+`)
+      expect(result.$find('user.name')).toBe('John')
+      expect(result.$find('user.address.city')).toBe('NYC')
+    })
+
+    test('finds key ending with pattern using *suffix', () => {
+      const result = sg.parse(`
+firstName "John"
+lastName "Doe"
+`)
+      expect(result.$find('*Name')).toBe('John')
+    })
+
+    test('finds key starting with pattern using prefix*', () => {
+      const result = sg.parse(`
+userName "johndoe"
+userEmail "john@example.com"
+`)
+      expect(result.$find('user*')).toBe('johndoe')
+    })
+
+    test('finds key containing pattern using *infix*', () => {
+      const result = sg.parse(`
+myUserName "johndoe"
+otherValue "test"
+`)
+      expect(result.$find('*User*')).toBe('johndoe')
+    })
+
+    test('finds wildcard key at any depth', () => {
+      const result = sg.parse(`
+user
+  details
+    firstName "John"
+`)
+      expect(result.$find('*Name')).toBe('John')
+    })
+
+    test('finds wildcard after exact path', () => {
+      const result = sg.parse(`
+user
+  personalInfo
+    firstName "John"
+    lastName "Doe"
+  workInfo
+    companyName "ACME"
+`)
+      expect(result.$find('user.personalInfo.*Name')).toBe('John')
+      expect(result.$find('user.workInfo.*Name')).toBe('ACME')
+    })
+
+    test('returns undefined for non-existent path', () => {
+      const result = sg.parse(`name "John"`)
+      expect(result.$find('nonexistent')).toBeUndefined()
+      expect(result.$find('user.name')).toBeUndefined()
+    })
+
+    test('returns undefined for non-matching wildcard', () => {
+      const result = sg.parse(`
+firstName "John"
+lastName "Doe"
+`)
+      expect(result.$find('*Email')).toBeUndefined()
+    })
+
+    test('respects depth option', () => {
+      const result = sg.parse(`
+level1
+  level2
+    level3
+      deepValue "found"
+`)
+      expect(result.$find('*Value', { depth: 2 })).toBeUndefined()
+      expect(result.$find('*Value', { depth: 4 })).toBe('found')
+      expect(result.$find('*Value')).toBe('found') // default Infinity
+    })
+
+    test('searches inside arrays', () => {
+      const result = sg.parse(`
+users [
+  "alice"
+  "bob"
+]
+items
+  item
+    name "First"
+  item
+    name "Second"
+`)
+      // Array of primitives returns undefined (no keys to match)
+      expect(result.$find('users.*')).toBeUndefined()
+      // Array of objects can be searched
+      expect(result.$find('items.item.name')).toBe('First')
+    })
+
+    test('finds first match with wildcard', () => {
+      const result = sg.parse(`
+user1
+  firstName "Alice"
+user2
+  firstName "Bob"
+`)
+      // Should return first match
+      expect(result.$find('*Name')).toBe('Alice')
+    })
+
+    test('wildcard matches any single key with *', () => {
+      const result = sg.parse(`
+config
+  database
+    host "localhost"
+`)
+      expect(result.$find('config.*.host')).toBe('localhost')
+    })
+
+    test('$find method is non-enumerable', () => {
+      const result = sg.parse(`name "John"`)
+      expect(Object.keys(result)).toEqual(['name'])
+      expect('$find' in result).toBe(true)
+    })
+  })
 })
 
 describe('slimgify', () => {

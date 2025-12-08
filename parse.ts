@@ -284,7 +284,92 @@ export const fetchUrl = async <T = any>(url: string, options?: FetchUrlOptions):
   }
 }
 
+export interface FindOptions {
+  /**
+   * Maximum depth to search. Defaults to Infinity.
+   */
+  depth?: number
+}
+
 const createParsedConfig = <T = any>(data: T): T => {
+  // Pattern matching for $find queries
+  const matchPattern = (key: string, pattern: string): boolean => {
+    if (pattern === '*') return true
+    if (pattern.startsWith('*') && pattern.endsWith('*') && pattern.length > 2) {
+      // *contains*
+      return key.includes(pattern.slice(1, -1))
+    }
+    if (pattern.startsWith('*')) {
+      // *endsWith
+      return key.endsWith(pattern.slice(1))
+    }
+    if (pattern.endsWith('*')) {
+      // startsWith*
+      return key.startsWith(pattern.slice(0, -1))
+    }
+    // exact match
+    return key === pattern
+  }
+
+  const hasWildcard = (pattern: string): boolean => pattern.includes('*')
+
+  const $find = (query: string, options?: FindOptions): any => {
+    const maxDepth = options?.depth ?? Infinity
+    const segments = query.split('.')
+
+    const findMatch = (
+      obj: any,
+      segmentIndex: number,
+      currentDepth: number
+    ): any => {
+      // All segments matched - return the value (even primitives)
+      if (segmentIndex >= segments.length) return obj
+
+      // Base cases for continuing the search
+      if (currentDepth > maxDepth) return undefined
+      if (obj === null || typeof obj !== 'object') return undefined
+
+      const pattern = segments[segmentIndex]
+
+      // Handle arrays - search each element
+      if (Array.isArray(obj)) {
+        for (const item of obj) {
+          const result = findMatch(item, segmentIndex, currentDepth)
+          if (result !== undefined) return result
+        }
+        return undefined
+      }
+
+      if (hasWildcard(pattern)) {
+        // Search current level first
+        for (const key of Object.keys(obj)) {
+          if (matchPattern(key, pattern)) {
+            const result = findMatch(obj[key], segmentIndex + 1, currentDepth + 1)
+            if (result !== undefined) return result
+          }
+        }
+
+        // Then search deeper (wildcard patterns search at any depth)
+        for (const key of Object.keys(obj)) {
+          const child = obj[key]
+          if (child !== null && typeof child === 'object') {
+            const result = findMatch(child, segmentIndex, currentDepth + 1)
+            if (result !== undefined) return result
+          }
+        }
+      } else {
+        // Exact match at current level only
+        if (Object.prototype.hasOwnProperty.call(obj, pattern)) {
+          return findMatch(obj[pattern], segmentIndex + 1, currentDepth + 1)
+        }
+      }
+
+      return undefined
+    }
+
+    return findMatch(data, 0, 0)
+  }
+
   // High-performance deep clone using iterative approach with stack
   const deepClone = (value: any): any => {
     // Fast path for primitives
@@ -353,13 +438,16 @@ const createParsedConfig = <T = any>(data: T): T => {
 
   return new Proxy(data as any, {
     get: (target, prop) => {
+      if (prop === '$find') {
+        return $find
+      }
       if (prop === '$clone') {
         return $clone
       }
       return target[prop as keyof typeof target]
     },
     has: (target, prop) => {
-      if (prop === '$clone') {
+      if (prop === '$find' || prop === '$clone') {
         return true
       }
       return prop in target
@@ -368,6 +456,14 @@ const createParsedConfig = <T = any>(data: T): T => {
       return Object.keys(target)
     },
     getOwnPropertyDescriptor: (target, prop) => {
+      if (prop === '$find') {
+        return {
+          enumerable: false,
+          configurable: true,
+          value: $find,
+          writable: false,
+        }
+      }
       if (prop === '$clone') {
         return {
           enumerable: false,

@@ -206,6 +206,44 @@ const str = sg.slimgify({
 
 Multi-line strings automatically become block strings. Large arrays use multi-line format.
 
+### `$find(query, options?)`
+
+Search for a value using a query string with optional wildcard patterns:
+
+```typescript
+const config = sg.parse(`
+user
+  personalInfo
+    firstName "John"
+    lastName "Doe"
+  workInfo
+    companyName "ACME"
+`)
+
+// Exact path
+config.$find('user.personalInfo.firstName') // "John"
+
+// Wildcard: *suffix matches keys ending with pattern
+config.$find('*Name')                        // "John" (first match at any depth)
+config.$find('user.workInfo.*Name')          // "ACME"
+
+// Wildcard: prefix* matches keys starting with pattern
+config.$find('first*')                       // "John"
+
+// Wildcard: *infix* matches keys containing pattern
+config.$find('*Name*')                       // "John"
+
+// Single wildcard matches any key
+config.$find('user.*.firstName')             // "John"
+```
+
+**Options:**
+- `depth` - Maximum depth to search (default: `Infinity`)
+
+```typescript
+config.$find('*Name', { depth: 2 }) // Only search 2 levels deep
+```
+
 ### `$clone()`
 
 Parsed objects include a `$clone()` method that creates a deep, completely decoupled copy:
@@ -229,7 +267,7 @@ config.user.tags  // ["admin", "active"] (unchanged)
 
 The `$clone` method is optimized for performance using an iterative algorithm that avoids recursion overhead. Date objects are properly cloned as new Date instances.
 
-> **Note:** Method names use a `$` prefix (e.g., `$clone`) because `$` is not a valid character in SlimGym keys. This guarantees that library methods will never conflict with your data keys.
+> **Note:** Method names use a `$` prefix (e.g., `$find`, `$clone`) because `$` is not a valid character in SlimGym keys. This guarantees that library methods will never conflict with your data keys.
 
 ## TypeScript
 
