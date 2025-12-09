@@ -33,6 +33,12 @@ export interface FetchUrlOptions {
   maxArraySize?: number
   /** Maximum depth of @import chains. Defaults to 10. */
   maxImportDepth?: number
+  /** HTTP headers to include in the request. */
+  headers?: Record<string, string> | Headers | [string, string][]
+  /** AbortSignal for request cancellation/timeout. */
+  signal?: AbortSignal
+  /** HTTP method. Defaults to 'GET'. */
+  method?: 'GET' | 'HEAD' | 'OPTIONS'
 }
 
 // Forward declaration for parse function (set from parse.ts)
@@ -120,7 +126,11 @@ export const fetchUrl = async <T = any>(url: string, options?: FetchUrlOptions):
   }
 
   try {
-    const response = await globalThis.fetch(url)
+    const response = await globalThis.fetch(url, {
+      method: options?.method ?? 'GET',
+      headers: options?.headers,
+      signal: options?.signal,
+    })
     if (!response.ok) {
       throw new ParseError(`Failed to fetch "${url}": ${response.status} ${response.statusText}`)
     }

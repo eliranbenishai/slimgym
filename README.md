@@ -181,12 +181,29 @@ Fetch and parse a SlimGym file from a URL using Node's native `fetch`.
 
 ```typescript
 const config = await sg.fetchUrl('https://example.com/config.sg')
+
+// With authentication header
+const config = await sg.fetchUrl('https://api.example.com/config.sg', {
+  headers: { 'Authorization': 'Bearer token123' }
+})
+
+// With timeout using AbortSignal
+const controller = new AbortController()
+setTimeout(() => controller.abort(), 5000)
+const config = await sg.fetchUrl('https://example.com/config.sg', {
+  signal: controller.signal
+})
+
+// Restrict to allowed hosts (SSRF prevention)
 const config = await sg.fetchUrl('https://cdn.example.com/config.sg', {
   allowedHosts: ['cdn.example.com']
 })
 ```
 
 **Options:**
+- `headers` - HTTP headers to include in the request
+- `signal` - AbortSignal for request cancellation/timeout
+- `method` - HTTP method (`'GET'`, `'HEAD'`, or `'OPTIONS'`). Defaults to `'GET'`
 - `baseUrl` - Base URL for resolving `@` imports within the content
 - `allowedHosts` - Restrict fetching to these hostnames (prevents SSRF)
 - `maxDepth`, `maxArraySize`, `maxImportDepth` - Same as `parse()`

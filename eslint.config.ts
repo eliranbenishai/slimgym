@@ -8,7 +8,7 @@ const __dirname = dirname(__filename)
 
 export default [
   {
-    ignores: ['node_modules', 'dist', '*.config.ts', '*.test.ts'],
+    ignores: ['node_modules', 'dist', '*.config.ts', '*.test.ts', '__tests__'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { parse } from './parse';
+import { parse } from '../parse';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -31,3 +31,4 @@ describe('Circular Reference Protection', () => {
         }
     });
 });
+

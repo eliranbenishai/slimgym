@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import sg, { ParseError } from './index'
+import sg, { ParseError } from '../index'
 
 describe('parse', () => {
   describe('basic parsing', () => {
@@ -1367,7 +1367,9 @@ items "item2"
 
   describe('imports', () => {
     test('imports file content', () => {
-      const result = sg.parse('imported @"./history-items.sg"')
+      const path = require('node:path')
+      const historyItemsPath = path.join(__dirname, '../history-items.sg')
+      const result = sg.parse(`imported @"${historyItemsPath}"`)
       expect(result.imported).toBeDefined()
       expect(result.imported.description).toBe("History items")
     })
@@ -2025,3 +2027,4 @@ a
     })
   })
 })
+

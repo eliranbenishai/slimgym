@@ -1,7 +1,7 @@
 import { describe, test } from 'vitest'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
-import sg from './index'
+import sg from '../index'
 
 const measureTime = (fn: () => void): number => {
   const start = performance.now()
