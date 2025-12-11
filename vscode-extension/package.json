@@ -1,13 +1,27 @@
 {
-    "name": "slimgym-vscode",
-    "displayName": "Slimgym",
-    "description": "Syntax highlighting for Slimgym configuration format",
-    "version": "0.0.1",
+    "name": "slimgym",
+    "displayName": "SlimGym",
+    "description": "Syntax highlighting for SlimGym configuration format (.sg files)",
+    "version": "0.1.0",
+    "publisher": "eliranbenishai",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/eliranbenishai/slimgym"
+    },
+    "license": "MIT",
+    "icon": "icon.png",
     "engines": {
         "vscode": "^1.70.0"
     },
     "categories": [
         "Programming Languages"
+    ],
+    "keywords": [
+        "slimgym",
+        "sg",
+        "config",
+        "configuration",
+        "syntax highlighting"
     ],
     "contributes": {
         "languages": [

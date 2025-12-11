@@ -8,4 +8,5 @@ yarn.lock
 coverage/
 dist/
 .nyc_output/
+.env
 .cursorrules

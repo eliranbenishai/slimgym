@@ -182,7 +182,7 @@ const deepFreeze = <T>(obj: T): T => {
 interface ConfigMethods<T> {
   $find: (query: string, options?: FindOptions) => unknown
   $findAll: (query: string, options?: FindOptions) => FindResult[]
-  $clone: () => T
+  $clone: (query?: string, options?: FindOptions) => unknown
   $freeze: () => T
 }
 
@@ -216,7 +216,22 @@ const createMethods = <T>(data: T): ConfigMethods<T> => ({
     return results
   },
 
-  $clone: (): T => deepClone(data),
+  $clone: (query?: string, options?: FindOptions): unknown => {
+    if (query === undefined) {
+      return deepClone(data)
+    }
+
+    const maxDepth = options?.depth ?? Infinity
+    const segments = query.split('.')
+    let result: unknown
+
+    traverseFind(data, segments, maxDepth, (_path, value) => {
+      result = deepClone(value)
+      return true // Stop at first match
+    })
+
+    return result
+  },
 
   $freeze: (): T => {
     deepFreeze(data)
