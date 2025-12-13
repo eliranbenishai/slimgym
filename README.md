@@ -51,6 +51,10 @@ npm install slimgym
 pnpm add slimgym
 ```
 
+## VS Code Extension
+
+For syntax highlighting, install the **SlimGym** VS Code extension from the Marketplace: [SlimGym (VS Code extension)](https://marketplace.visualstudio.com/items?itemName=eliranbenishai.slimgym).
+
 ## Quick Start
 
 ```typescript
