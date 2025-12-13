@@ -1465,7 +1465,7 @@ key2 ["b"]
   })
 })
 
-describe('fetch', () => {
+describe('file', () => {
   describe('basic file fetching', () => {
     test('fetches and parses a file with absolute path', () => {
       const fs = require('node:fs')
@@ -1478,7 +1478,7 @@ age 30
 active true
 `)
       try {
-        const result = sg.fetch(tempFile)
+        const result = sg.file(tempFile)
         expect(result).toEqual({
           name: 'John',
           age: 30,
@@ -1502,7 +1502,7 @@ database
   port 5432
 `)
       try {
-        const result = sg.fetch('config.sg', { baseDir: tempDir })
+        const result = sg.file('config.sg', { baseDir: tempDir })
         expect(result).toEqual({
           database: {
             host: 'localhost',
@@ -1536,7 +1536,7 @@ app
   config @"configs/included.sg"
 `)
       try {
-        const result = sg.fetch(mainFile)
+        const result = sg.file(mainFile)
         expect(result).toEqual({
           app: {
             name: 'MyApp',
@@ -1568,7 +1568,7 @@ name "MyApp"
 version 1
 `)
       try {
-        const result = sg.fetch<AppConfig>(tempFile)
+        const result = sg.file<AppConfig>(tempFile)
         expect(result.name).toBe('MyApp')
         expect(result.version).toBe(1)
       } finally {
@@ -1580,11 +1580,11 @@ version 1
   describe('error handling', () => {
     test('throws ParseError for non-existent file', () => {
       expect(() => {
-        sg.fetch('/nonexistent/path/file.sg')
+        sg.file('/nonexistent/path/file.sg')
       }).toThrow(ParseError)
 
       try {
-        sg.fetch('/nonexistent/path/file.sg')
+        sg.file('/nonexistent/path/file.sg')
       } catch (e) {
         expect((e as ParseError).message).toContain('File not found')
       }
@@ -1592,11 +1592,11 @@ version 1
 
     test('throws ParseError for empty file path', () => {
       expect(() => {
-        sg.fetch('')
+        sg.file('')
       }).toThrow(ParseError)
 
       try {
-        sg.fetch('')
+        sg.file('')
       } catch (e) {
         expect((e as ParseError).message).toContain('non-empty string')
       }
@@ -1604,11 +1604,11 @@ version 1
 
     test('throws ParseError for whitespace-only file path', () => {
       expect(() => {
-        sg.fetch('   ')
+        sg.file('   ')
       }).toThrow(ParseError)
 
       try {
-        sg.fetch('   ')
+        sg.file('   ')
       } catch (e) {
         expect((e as ParseError).message).toContain('non-empty string')
       }
@@ -1617,7 +1617,7 @@ version 1
     test('throws ParseError for invalid input type', () => {
       expect(() => {
         // @ts-expect-error Testing invalid input
-        sg.fetch(123)
+        sg.file(123)
       }).toThrow(ParseError)
     })
 
@@ -1631,7 +1631,7 @@ invalid!key "value"
 `)
       try {
         expect(() => {
-          sg.fetch(tempFile)
+          sg.file(tempFile)
         }).toThrow(ParseError)
       } finally {
         fs.unlinkSync(tempFile)
@@ -1646,7 +1646,7 @@ invalid!key "value"
       fs.mkdirSync(tempDir, { recursive: true })
       try {
         expect(() => {
-          sg.fetch(tempDir)
+          sg.file(tempDir)
         }).toThrow(ParseError)
       } finally {
         fs.rmdirSync(tempDir)
@@ -1655,7 +1655,7 @@ invalid!key "value"
   })
 })
 
-describe('fetchAsync', () => {
+describe('fileAsync', () => {
   test('asynchronously fetches and parses a file', async () => {
     const fs = require('node:fs')
     const path = require('node:path')
@@ -1666,7 +1666,7 @@ name "AsyncTest"
 value 42
 `)
     try {
-      const result = await sg.fetchAsync(tempFile)
+      const result = await sg.fileAsync(tempFile)
       expect(result).toEqual({
         name: 'AsyncTest',
         value: 42,
@@ -1688,7 +1688,7 @@ async true
 port 3000
 `)
     try {
-      const result = await sg.fetchAsync('async-config.sg', { baseDir: tempDir })
+      const result = await sg.fileAsync('async-config.sg', { baseDir: tempDir })
       expect(result).toEqual({
         async: true,
         port: 3000,
@@ -1715,7 +1715,7 @@ root "main"
 imported @"included.sg"
 `)
     try {
-      const result = await sg.fetchAsync(mainFile)
+      const result = await sg.fileAsync(mainFile)
       expect(result).toEqual({
         root: 'main',
         imported: { nested: 'value' },
@@ -1728,11 +1728,11 @@ imported @"included.sg"
   })
 
   test('throws ParseError for non-existent file', async () => {
-    await expect(sg.fetchAsync('/nonexistent/path/file.sg')).rejects.toThrow(ParseError)
+    await expect(sg.fileAsync('/nonexistent/path/file.sg')).rejects.toThrow(ParseError)
   })
 
   test('throws ParseError for empty file path', async () => {
-    await expect(sg.fetchAsync('')).rejects.toThrow(ParseError)
+    await expect(sg.fileAsync('')).rejects.toThrow(ParseError)
   })
 
   test('supports TypeScript generics', async () => {
@@ -1749,7 +1749,7 @@ name "TypedAsync"
 count 100
 `)
     try {
-      const result = await sg.fetchAsync<TypedConfig>(tempFile)
+      const result = await sg.fileAsync<TypedConfig>(tempFile)
       expect(result.name).toBe('TypedAsync')
       expect(result.count).toBe(100)
     } finally {
@@ -1758,32 +1758,32 @@ count 100
   })
 })
 
-describe('fetchUrl', () => {
+describe('fetch', () => {
   test('throws ParseError for empty URL', async () => {
-    await expect(sg.fetchUrl('')).rejects.toThrow(ParseError)
+    await expect(sg.fetch('')).rejects.toThrow(ParseError)
   })
 
   test('throws ParseError for whitespace-only URL', async () => {
-    await expect(sg.fetchUrl('   ')).rejects.toThrow(ParseError)
+    await expect(sg.fetch('   ')).rejects.toThrow(ParseError)
   })
 
   test('throws ParseError for invalid input type', async () => {
     // @ts-expect-error Testing invalid input
-    await expect(sg.fetchUrl(123)).rejects.toThrow(ParseError)
+    await expect(sg.fetch(123)).rejects.toThrow(ParseError)
   })
 
   test('throws ParseError for failed fetch', async () => {
     // This URL should fail to fetch
-    await expect(sg.fetchUrl('http://localhost:99999/nonexistent.sg')).rejects.toThrow(ParseError)
+    await expect(sg.fetch('http://localhost:99999/nonexistent.sg')).rejects.toThrow(ParseError)
   })
 
   test('throws ParseError when host is not in allowedHosts', async () => {
     await expect(
-      sg.fetchUrl('https://malicious.com/config.sg', { allowedHosts: ['example.com'] })
+      sg.fetch('https://malicious.com/config.sg', { allowedHosts: ['example.com'] })
     ).rejects.toThrow(ParseError)
 
     try {
-      await sg.fetchUrl('https://malicious.com/config.sg', { allowedHosts: ['example.com'] })
+      await sg.fetch('https://malicious.com/config.sg', { allowedHosts: ['example.com'] })
     } catch (e) {
       expect((e as ParseError).message).toContain('not in the allowed hosts list')
     }
@@ -1840,16 +1840,16 @@ parent
 
       try {
         // This should work - file is inside sandbox
-        const result = sg.fetch('config.sg', { baseDir: sandboxDir, sandboxDir })
+        const result = sg.file('config.sg', { baseDir: sandboxDir, sandboxDir })
         expect(result.name).toBe('test')
 
         // This should fail - trying to escape sandbox
         expect(() => {
-          sg.fetch('../../../etc/passwd', { baseDir: sandboxDir, sandboxDir })
+          sg.file('../../../etc/passwd', { baseDir: sandboxDir, sandboxDir })
         }).toThrow(ParseError)
 
         try {
-          sg.fetch('../../../etc/passwd', { baseDir: sandboxDir, sandboxDir })
+          sg.file('../../../etc/passwd', { baseDir: sandboxDir, sandboxDir })
         } catch (e) {
           expect((e as ParseError).message).toContain('Path traversal detected')
         }
@@ -1859,7 +1859,7 @@ parent
       }
     })
 
-    test('fetchAsync blocks path traversal with sandboxDir', async () => {
+    test('fileAsync blocks path traversal with sandboxDir', async () => {
       const fs = require('node:fs')
       const path = require('node:path')
       const os = require('node:os')
@@ -1871,12 +1871,12 @@ parent
 
       try {
         // This should work
-        const result = await sg.fetchAsync('config.sg', { baseDir: sandboxDir, sandboxDir })
+        const result = await sg.fileAsync('config.sg', { baseDir: sandboxDir, sandboxDir })
         expect(result.name).toBe('async-test')
 
         // This should fail
         await expect(
-          sg.fetchAsync('../../../etc/passwd', { baseDir: sandboxDir, sandboxDir })
+          sg.fileAsync('../../../etc/passwd', { baseDir: sandboxDir, sandboxDir })
         ).rejects.toThrow(ParseError)
       } finally {
         fs.unlinkSync(configFile)
@@ -1899,7 +1899,7 @@ parent
 
       try {
         expect(() => {
-          sg.fetch('main.sg', { baseDir: sandboxDir, sandboxDir })
+          sg.file('main.sg', { baseDir: sandboxDir, sandboxDir })
         }).toThrow(ParseError)
       } finally {
         fs.unlinkSync(mainFile)
@@ -1989,11 +1989,11 @@ items [
       try {
         // Should fail with maxImportDepth of 2
         expect(() => {
-          sg.fetch('a.sg', { baseDir: tempDir, maxImportDepth: 2 })
+          sg.file('a.sg', { baseDir: tempDir, maxImportDepth: 2 })
         }).toThrow(ParseError)
 
         // Should work with higher limit
-        const result = sg.fetch('a.sg', { baseDir: tempDir, maxImportDepth: 10 })
+        const result = sg.file('a.sg', { baseDir: tempDir, maxImportDepth: 10 })
         expect(result.a.b.c.value).toBe('d')
       } finally {
         fs.unlinkSync(path.join(tempDir, 'a.sg'))

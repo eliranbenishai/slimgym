@@ -82,7 +82,7 @@ const createParseOptions = (absolutePath: string, options?: FetchOptions): Parse
   _sandboxDir: options?.sandboxDir,
 })
 
-export const fetch = <T = any>(filePath: string, options?: FetchOptions): T => {
+export const file = <T = any>(filePath: string, options?: FetchOptions): T => {
   if (parseFunction === null) {
     throw new ParseError('Parser not initialized')
   }
@@ -97,7 +97,7 @@ export const fetch = <T = any>(filePath: string, options?: FetchOptions): T => {
   }
 }
 
-export const fetchAsync = async <T = any>(filePath: string, options?: FetchOptions): Promise<T> => {
+export const fileAsync = async <T = any>(filePath: string, options?: FetchOptions): Promise<T> => {
   if (parseFunction === null) {
     throw new ParseError('Parser not initialized')
   }
@@ -112,7 +112,7 @@ export const fetchAsync = async <T = any>(filePath: string, options?: FetchOptio
   }
 }
 
-export const fetchUrl = async <T = any>(url: string, options?: FetchUrlOptions): Promise<T> => {
+export const fetch = async <T = any>(url: string, options?: FetchUrlOptions): Promise<T> => {
   if (parseFunction === null) {
     throw new ParseError('Parser not initialized')
   }

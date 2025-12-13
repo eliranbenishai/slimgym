@@ -1,15 +1,15 @@
-export { parse, fetch, fetchAsync, fetchUrl, type ParseOptions, type FetchOptions, type FetchUrlOptions, type FindOptions, type FindResult } from './parse.js'
+export { parse, file, fileAsync, fetch, type ParseOptions, type FetchOptions, type FetchUrlOptions, type FindOptions, type FindResult } from './parse.js'
 export { slimgify } from './slimgify.js'
 export { ParseError, type NodeObject, type NodeValue, type Primitive } from './types.js'
 
 // Default export for backward compatibility
-import { parse, fetch, fetchAsync, fetchUrl } from './parse.js'
+import { parse, file, fileAsync, fetch } from './parse.js'
 import { slimgify } from './slimgify.js'
 
 export default {
   parse,
+  file,
+  fileAsync,
   fetch,
-  fetchAsync,
-  fetchUrl,
   slimgify,
 }

@@ -28,11 +28,11 @@ app
 `)
 
 // Fetch from a file (sync or async)
-const fromFile = sg.fetch('./config.sg')
-const fromFileAsync = await sg.fetchAsync('./config.sg')
+const fromFile = sg.file('./config.sg')
+const fromFileAsync = await sg.fileAsync('./config.sg')
 
 // Fetch from a URL
-const fromUrl = await sg.fetchUrl('https://example.com/config.sg')
+const fromUrl = await sg.fetch('https://example.com/config.sg')
 
 // Convert back to SlimGym format
 const str = sg.slimgify({ name: "MyApp", port: 8080 })
@@ -48,7 +48,7 @@ const str = sg.slimgify({ name: "MyApp", port: 8080 })
 - **Repeated keys** - Automatically converted to arrays
 - **Forced arrays** - `[]key` syntax for single-item arrays
 - **File imports** - `@"path"` and `@@"path"` syntax
-- **File fetching** - Read files with `fetch()`, `fetchAsync()`, or `fetchUrl()`
+- **File fetching** - Read files with `file()`, `fileAsync()`, and fetch URLs with `fetch()`
 - **Bidirectional** - Convert objects back with `slimgify()`
 
 ## Syntax Guide
@@ -150,13 +150,13 @@ const config = sg.parse<MyConfig>(`name "App"`)
 - `maxArraySize` - Maximum array size (default: 10000, set to 0 or `Infinity` to disable)
 - `maxImportDepth` - Maximum `@` import chain depth (default: 10, set to 0 or `Infinity` to disable)
 
-### `fetch<T>(filePath: string, options?): T`
+### `file<T>(filePath: string, options?): T`
 
 Read and parse a SlimGym file synchronously.
 
 ```typescript
-const config = sg.fetch('./config.sg')
-const config = sg.fetch('config.sg', { baseDir: '/app', sandboxDir: '/app' })
+const config = sg.file('./config.sg')
+const config = sg.file('config.sg', { baseDir: '/app', sandboxDir: '/app' })
 ```
 
 **Options:**
@@ -164,38 +164,38 @@ const config = sg.fetch('config.sg', { baseDir: '/app', sandboxDir: '/app' })
 - `sandboxDir` - Restrict file access to this directory (prevents path traversal)
 - `maxDepth`, `maxArraySize`, `maxImportDepth` - Same as `parse()`
 
-### `fetchAsync<T>(filePath: string, options?): Promise<T>`
+### `fileAsync<T>(filePath: string, options?): Promise<T>`
 
 Read and parse a SlimGym file asynchronously.
 
 ```typescript
-const config = await sg.fetchAsync('./config.sg')
-const config = await sg.fetchAsync('config.sg', { baseDir: '/app', sandboxDir: '/app' })
+const config = await sg.fileAsync('./config.sg')
+const config = await sg.fileAsync('config.sg', { baseDir: '/app', sandboxDir: '/app' })
 ```
 
-**Options:** Same as `fetch()`
+**Options:** Same as `file()`
 
-### `fetchUrl<T>(url: string, options?): Promise<T>`
+### `fetch<T>(url: string, options?): Promise<T>`
 
 Fetch and parse a SlimGym file from a URL using Node's native `fetch`.
 
 ```typescript
-const config = await sg.fetchUrl('https://example.com/config.sg')
+const config = await sg.fetch('https://example.com/config.sg')
 
 // With authentication header
-const config = await sg.fetchUrl('https://api.example.com/config.sg', {
+const config = await sg.fetch('https://api.example.com/config.sg', {
   headers: { 'Authorization': 'Bearer token123' }
 })
 
 // With timeout using AbortSignal
 const controller = new AbortController()
 setTimeout(() => controller.abort(), 5000)
-const config = await sg.fetchUrl('https://example.com/config.sg', {
+const config = await sg.fetch('https://example.com/config.sg', {
   signal: controller.signal
 })
 
 // Restrict to allowed hosts (SSRF prevention)
-const config = await sg.fetchUrl('https://cdn.example.com/config.sg', {
+const config = await sg.fetch('https://cdn.example.com/config.sg', {
   allowedHosts: ['cdn.example.com']
 })
 ```
@@ -350,9 +350,9 @@ interface Config {
 }
 
 const config = sg.parse<Config>(`name "App"\nport 8080`)
-const config = sg.fetch<Config>('./config.sg')
-const config = await sg.fetchAsync<Config>('./config.sg')
-const config = await sg.fetchUrl<Config>('https://example.com/config.sg')
+const config = sg.file<Config>('./config.sg')
+const config = await sg.fileAsync<Config>('./config.sg')
+const config = await sg.fetch<Config>('https://example.com/config.sg')
 ```
 
 ## Tree-Shaking
@@ -360,7 +360,7 @@ const config = await sg.fetchUrl<Config>('https://example.com/config.sg')
 Import only what you need:
 
 ```typescript
-import { parse, fetch, fetchAsync, fetchUrl } from 'slimgym/parse'
+import { parse, file, fileAsync, fetch } from 'slimgym/parse'
 import { slimgify } from 'slimgym/slimgify'
 ```
 
@@ -372,7 +372,7 @@ import { slimgify } from 'slimgym/slimgify'
 import { ParseError } from 'slimgym'
 
 try {
-  sg.fetch('./missing.sg')
+  sg.file('./missing.sg')
 } catch (error) {
   if (error instanceof ParseError) {
     console.error(error.message)  // "File not found: ..."
@@ -399,7 +399,7 @@ Use `sandboxDir` to restrict file access:
 
 ```typescript
 // Only allows access within /app/config
-sg.fetch('../../../etc/passwd', {
+sg.file('../../../etc/passwd', {
   baseDir: '/app/config',
   sandboxDir: '/app/config'  // Blocks escape attempts
 })
@@ -410,7 +410,7 @@ sg.fetch('../../../etc/passwd', {
 Use `allowedHosts` to restrict URL fetching:
 
 ```typescript
-await sg.fetchUrl('https://internal-api.local/config.sg', {
+await sg.fetch('https://internal-api.local/config.sg', {
   allowedHosts: ['cdn.example.com']  // Blocks - not in allowlist
 })
 ```
@@ -459,7 +459,7 @@ yarn add slimgym
 pnpm add slimgym
 ```
 
-**No runtime differences** — the package uses standard Node.js APIs (`node:fs`, `node:path`) that work identically in both Bun and Node.js. All features, including `fetch()`, `fetchAsync()`, `fetchUrl()`, and `parse()`, behave the same regardless of runtime.
+**No runtime differences** — the package uses standard Node.js APIs (`node:fs`, `node:path`) that work identically in both Bun and Node.js. All features, including `file()`, `fileAsync()`, `fetch()`, and `parse()`, behave the same regardless of runtime.
 
 If you want to contribute or run the test suite locally with Node.js instead of Bun:
 

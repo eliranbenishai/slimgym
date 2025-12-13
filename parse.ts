@@ -18,7 +18,7 @@ import { setFetchParseFunction } from './fetch.js'
 
 // Re-export types and functions
 export { type ParseOptions } from './parser-helpers.js'
-export { type FetchOptions, type FetchUrlOptions, fetch, fetchAsync, fetchUrl } from './fetch.js'
+export { type FetchOptions, type FetchUrlOptions, file, fileAsync, fetch } from './fetch.js'
 export { type FindOptions, type FindResult } from './config-wrapper.js'
 
 /**
