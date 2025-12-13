@@ -20,7 +20,7 @@ pnpm add slimgym
 import sg from 'slimgym'
 
 // Parse a string
-const config = sg.parse(`
+const parsed = sg.parse(`
 app
   name "MyApp"
   port 8080
@@ -28,11 +28,11 @@ app
 `)
 
 // Fetch from a file (sync or async)
-const config = sg.fetch('./config.sg')
-const config = await sg.fetchAsync('./config.sg')
+const fromFile = sg.fetch('./config.sg')
+const fromFileAsync = await sg.fetchAsync('./config.sg')
 
 // Fetch from a URL
-const config = await sg.fetchUrl('https://example.com/config.sg')
+const fromUrl = await sg.fetchUrl('https://example.com/config.sg')
 
 // Convert back to SlimGym format
 const str = sg.slimgify({ name: "MyApp", port: 8080 })
@@ -146,9 +146,9 @@ const config = sg.parse<MyConfig>(`name "App"`)
 
 **Options:**
 - `baseDir` - Base directory for `@` imports (default: `process.cwd()`)
-- `maxDepth` - Maximum nesting depth (default: 100, set to 0 to disable)
-- `maxArraySize` - Maximum array size (default: 10000, set to 0 to disable)
-- `maxImportDepth` - Maximum `@` import chain depth (default: 10, set to 0 to disable)
+- `maxDepth` - Maximum nesting depth (default: 100, set to 0 or `Infinity` to disable)
+- `maxArraySize` - Maximum array size (default: 10000, set to 0 or `Infinity` to disable)
+- `maxImportDepth` - Maximum `@` import chain depth (default: 10, set to 0 or `Infinity` to disable)
 
 ### `fetch<T>(filePath: string, options?): T`
 
@@ -286,7 +286,9 @@ The `key` field contains the full path to the match, including array indices whe
 
 ### `$clone()`
 
-Parsed objects include a `$clone()` method that creates a deep, completely decoupled copy:
+### `$clone(query?, options?)`
+
+Parsed objects include a `$clone()` method that creates a deep, completely decoupled copy. You can also pass the same selector syntax as `$find` to clone just a portion of the parsed config:
 
 ```typescript
 const config = sg.parse(`
@@ -305,7 +307,16 @@ config.user.name  // "John" (unchanged)
 config.user.tags  // ["admin", "active"] (unchanged)
 ```
 
-The `$clone` method is optimized for performance using an iterative algorithm that avoids recursion overhead. Date objects are properly cloned as new Date instances.
+Clone only a portion (supports wildcards + `depth`, same as `$find`):
+
+```typescript
+const tagsCopy = config.$clone('user.tags')      // ["admin", "active"]
+const firstNameCopy = config.$clone('*name')     // "John" (first match, cloned)
+```
+
+If the selector does not match anything, `$clone(query)` returns `undefined`.
+
+The `$clone` method is optimized for performance using an iterative algorithm that avoids recursion overhead. Date objects are properly cloned as new `Date` instances.
 
 ### `$freeze()`
 
@@ -353,7 +364,7 @@ import { parse, fetch, fetchAsync, fetchUrl } from 'slimgym/parse'
 import { slimgify } from 'slimgym/slimgify'
 ```
 
-**Exported Types:** `NodeObject`, `NodeValue`, `Primitive`, `ParseError`, `ParseOptions`, `FetchOptions`, `FetchUrlOptions`
+**Exported Types:** `NodeObject`, `NodeValue`, `Primitive`, `ParseError`, `ParseOptions`, `FetchOptions`, `FetchUrlOptions`, `FindOptions`, `FindResult`
 
 ## Error Handling
 
