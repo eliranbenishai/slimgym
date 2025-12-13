@@ -431,11 +431,17 @@ Set any limit to `0` or `Infinity` to disable it.
 
 ## Use Cases
 
-**Configuration files** - App settings, environment configs, feature flags
+**AI prompt templates** - Store system prompts, few-shot examples, and long multi-line instructions with block strings (no escaping).
 
-**Content definition** - CMS content, templates, theming
+**Multi-environment config** - Compose a base config and override per environment using `@` imports.
 
-**Data serialization** - Human-readable data storage and exchange
+**Test fixtures** - Keep readable test data and API mock responses; compose fixtures with forced arrays and imports.
+
+**Game content** - Dialogue, quests, item databases—friendly for writers/designers to edit safely.
+
+**i18n / localization** - Structured translations with block strings for long copy.
+
+**CMS content** - Static pages with metadata + content in one human-editable file.
 
 ## Development
 
