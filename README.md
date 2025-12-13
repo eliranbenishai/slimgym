@@ -2,6 +2,43 @@
 
 An indentation-based configuration format that combines clean syntax with modern features like block strings, arrays, comments, type inference, and bidirectional conversion.
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Features](#features)
+- [Syntax Guide](#syntax-guide)
+  - [Basic Values](#basic-values)
+  - [Nested Objects](#nested-objects)
+  - [Arrays](#arrays)
+  - [Block Strings](#block-strings)
+  - [Comments](#comments)
+  - [Repeated Keys (Auto-Arrays)](#repeated-keys-auto-arrays)
+  - [Forced Arrays](#forced-arrays)
+  - [File Imports](#file-imports)
+- [API](#api)
+  - [`parse<T>(input: string, options?): T`](#parsetinput-string-options-t)
+  - [`file<T>(filePath: string, options?): T`](#filetfilepath-string-options-t)
+  - [`fileAsync<T>(filePath: string, options?): Promise<T>`](#fileasynctfilepath-string-options-promiset)
+  - [`fetch<T>(url: string, options?): Promise<T>`](#fetchturl-string-options-promiset)
+  - [`slimgify(obj: any): string`](#slimgifyobj-any-string)
+  - [`$find(query, options?)`](#findquery-options)
+  - [`$findAll(query, options?)`](#findallquery-options)
+  - [`$clone(query?, options?)`](#clonequery-options)
+  - [`$freeze()`](#freeze)
+- [TypeScript](#typescript)
+- [Tree-Shaking](#tree-shaking)
+- [Error Handling](#error-handling)
+- [Security](#security)
+  - [Prototype Pollution Protection](#prototype-pollution-protection)
+  - [Path Traversal Prevention](#path-traversal-prevention)
+  - [SSRF Prevention](#ssrf-prevention)
+  - [DoS Protection](#dos-protection)
+- [Use Cases](#use-cases)
+- [Development](#development)
+  - [Using Node.js](#using-nodejs)
+- [License](#license)
+
 ## Installation
 
 Works with both Bun and Node.js (v18+):
@@ -283,8 +320,6 @@ config.$findAll('*Name')
 The `key` field contains the full path to the match, including array indices when searching through arrays.
 
 **Options:** Same as `$find` — use `depth` to limit search depth.
-
-### `$clone()`
 
 ### `$clone(query?, options?)`
 
