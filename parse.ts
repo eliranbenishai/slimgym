@@ -21,6 +21,58 @@ export { type ParseOptions } from './parser-helpers.js'
 export { type FetchOptions, type FetchUrlOptions, file, fileAsync, fetch } from './fetch.js'
 export { type FindOptions, type FindResult } from './config-wrapper.js'
 
+const isValidKeyCharCode = (code: number): boolean => {
+  // a-z
+  if (code >= 97 && code <= 122) return true
+  // A-Z
+  if (code >= 65 && code <= 90) return true
+  // 0-9
+  if (code >= 48 && code <= 57) return true
+  // '_' or '-'
+  return code === 95 || code === 45
+}
+
+/**
+ * Finds the end index (exclusive) of a value token on a single line.
+ * Trims trailing spaces and strips inline comments (` # ...`) while respecting quoted strings.
+ */
+const findValueTokenEnd = (input: string, start: number, lineEnd: number): number => {
+  let inString = false
+  let quoteChar = -1
+
+  for (let j = start; j < lineEnd; j++) {
+    const c = input.charCodeAt(j)
+
+    if (inString) {
+      // End quote if not escaped
+      if (c === quoteChar && input.charCodeAt(j - 1) !== 92) {
+        inString = false
+        quoteChar = -1
+      }
+      continue
+    }
+
+    if (c === 34 || c === 39) { // " or '
+      inString = true
+      quoteChar = c
+      continue
+    }
+
+    if (c === 35) { // #
+      // Inline comment only when preceded by a space and followed by space or EOL.
+      if (j > start && input.charCodeAt(j - 1) === 32 && (j + 1 === lineEnd || input.charCodeAt(j + 1) === 32)) {
+        let end = j - 1
+        while (end > start && input.charCodeAt(end - 1) === 32) end--
+        return end
+      }
+    }
+  }
+
+  let end = lineEnd
+  while (end > start && input.charCodeAt(end - 1) === 32) end--
+  return end
+}
+
 /**
  * Parses a SlimGym string into a JavaScript object.
  */
@@ -34,7 +86,6 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
 
   const len = input.length
   let pos = 0
-  let lineStart = 0
   let lineIndex = 0
 
   const root: NodeObject = {}
@@ -45,10 +96,10 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
   }
 
   while (pos < len) {
-    let lineEnd = input.indexOf('\n', pos)
+    const lineStart = pos
+    let lineEnd = input.indexOf('\n', lineStart)
     if (lineEnd === -1) lineEnd = len
 
-    // Calculate indent
     let indent = 0
     let i = lineStart
     while (i < lineEnd && input.charCodeAt(i) === 32) {
@@ -56,27 +107,26 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
       i++
     }
 
-    // Skip empty lines
     if (i === lineEnd) {
       lineIndex++
       pos = lineEnd + 1
-      lineStart = pos
       continue
     }
 
-    // Skip comments (# followed by space or end of line)
+    // Skip full-line comments (# followed by space or end of line)
     if (input.charCodeAt(i) === 35 && (i + 1 === lineEnd || input.charCodeAt(i + 1) === 32)) {
-        lineIndex++
-        pos = lineEnd + 1
-        lineStart = pos
-        continue
+      lineIndex++
+      pos = lineEnd + 1
+      continue
     }
 
-    // Parse key
+    const line = input.slice(lineStart, lineEnd)
+
     const keyStart = i
     while (i < lineEnd && input.charCodeAt(i) !== 32) i++
 
-    let key = input.slice(keyStart, i)
+    const rawKey = input.slice(keyStart, i)
+    let key = rawKey
     let forceArray = false
 
     if (key.startsWith('[]')) {
@@ -84,58 +134,68 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
       key = key.slice(2)
     }
 
-    if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
-      throw new ParseError(`Invalid key format: "${input.slice(keyStart, i)}"`, lineIndex, input.slice(lineStart, lineEnd))
+    for (let k = 0; k < key.length; k++) {
+      if (!isValidKeyCharCode(key.charCodeAt(k))) {
+        throw new ParseError(`Invalid key format: "${rawKey}"`, lineIndex, line)
+      }
     }
 
     if (DANGEROUS_KEYS.has(key)) {
-      throw new ParseError(`Forbidden key "${key}" (potential prototype pollution)`, lineIndex, input.slice(lineStart, lineEnd))
+      throw new ParseError(`Forbidden key "${key}" (potential prototype pollution)`, lineIndex, line)
     }
 
-    // Skip spaces after key
     while (i < lineEnd && input.charCodeAt(i) === 32) i++
 
     let value: NodeValue
 
-    if (i === lineEnd) {
+    if (i < lineEnd) {
+      // If line has only a comment after the key (`key # comment`), treat it as no-value.
+      if (input.charCodeAt(i) === 35 && (i + 1 === lineEnd || input.charCodeAt(i + 1) === 32)) {
+        value = {}
+        pos = lineEnd + 1
+        lineIndex++
+      } else {
+        const valueEnd = findValueTokenEnd(input, i, lineEnd)
+        if (valueEnd === i) {
+          value = {}
+          pos = lineEnd + 1
+          lineIndex++
+        } else {
+          const char = input.charCodeAt(i)
+
+          if (char === 91) { // [
+            value = parseArrayValue(input, i, lineEnd, lineIndex, lineStart, parseValueWithOptions, maxArraySize)
+            // Check if it was an inline array or multi-line
+            const closingIdx = findInlineArrayClose(input, i, lineEnd)
+            if (closingIdx !== -1) {
+              pos = lineEnd + 1
+              lineIndex++
+            } else {
+              // Multi-line array
+              const result = parseMultiLineArray(input, lineEnd + 1, indent, len, parseValueWithOptions, maxArraySize, lineIndex + 1)
+              value = result.value
+              pos = result.pos
+              lineIndex = result.lineIndex
+            }
+          } else if (char === 34 && input.charCodeAt(i + 1) === 34 && input.charCodeAt(i + 2) === 34) {
+            // Block string """
+            const result = parseBlockString(input, lineEnd + 1, indent, len)
+            value = result.value
+            pos = result.pos
+            lineIndex = result.lineIndex
+          } else {
+            // Simple value (strip inline comments and trailing spaces)
+            value = parseValueWithOptions(input.slice(i, valueEnd), lineIndex, line)
+            pos = lineEnd + 1
+            lineIndex++
+          }
+        }
+      }
+    } else {
       // No value -> empty object
       value = {}
       pos = lineEnd + 1
       lineIndex++
-      lineStart = pos
-    } else {
-      const char = input.charCodeAt(i)
-
-      if (char === 91) { // [
-        value = parseArrayValue(input, i, lineEnd, lineIndex, lineStart, parseValueWithOptions, maxArraySize)
-        // Check if it was an inline array or multi-line
-        const closingIdx = findInlineArrayClose(input, i, lineEnd)
-        if (closingIdx !== -1) {
-          pos = lineEnd + 1
-          lineIndex++
-          lineStart = pos
-        } else {
-          // Multi-line array
-          const result = parseMultiLineArray(input, lineEnd + 1, indent, len, parseValueWithOptions, maxArraySize, lineIndex + 1)
-          value = result.value
-          pos = result.pos
-          lineIndex = result.lineIndex
-          lineStart = pos
-        }
-      } else if (char === 34 && input.charCodeAt(i + 1) === 34 && input.charCodeAt(i + 2) === 34) {
-        // Block string """
-        const result = parseBlockString(input, lineEnd + 1, indent, len)
-        value = result.value
-        pos = result.pos
-        lineIndex = result.lineIndex
-        lineStart = pos
-      } else {
-        // Simple value
-        value = parseValueWithOptions(input.slice(i, lineEnd).trim(), lineIndex, input.slice(lineStart, lineEnd))
-        pos = lineEnd + 1
-        lineIndex++
-        lineStart = pos
-      }
     }
 
     // Attach to parent
@@ -155,10 +215,9 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
       parent[key] = forceArray ? [value] : value
     }
 
-    // Push object values to stack
     if (typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date)) {
       if (maxDepth > 0 && maxDepth !== Infinity && stack.length >= maxDepth) {
-        throw new ParseError(`Maximum nesting depth of ${maxDepth} exceeded`, lineIndex, input.slice(lineStart, lineEnd))
+        throw new ParseError(`Maximum nesting depth of ${maxDepth} exceeded`, lineIndex, line)
       }
       stack.push({ indent, obj: value })
     }

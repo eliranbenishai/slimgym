@@ -97,6 +97,19 @@ age 30
         age: 30,
       })
     })
+
+    test('supports inline comments', () => {
+      const result = sg.parse(`
+name "John" # comment
+age 30      # comment
+empty       # comment
+`)
+      expect(result).toEqual({
+        name: 'John',
+        age: 30,
+        empty: {},
+      })
+    })
   })
 
   describe('type inference', () => {
