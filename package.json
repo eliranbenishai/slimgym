@@ -1,6 +1,6 @@
 {
   "name": "slimgym",
-  "version": "1.6.4",
+  "version": "1.6.5",
   "description": "An indentation-based configuration format parser for the 24th and ½ century!",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
