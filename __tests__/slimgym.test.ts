@@ -751,40 +751,41 @@ user
       expect(result.$find('user.address.city')).toBe('NYC')
     })
 
-    test('finds key ending with pattern using *suffix', () => {
+    test('finds key ending with pattern using regex', () => {
       const result = sg.parse(`
 firstName "John"
 lastName "Doe"
 `)
-      expect(result.$find('*Name')).toBe('John')
+      expect(result.$find('Name$')).toBe('John')
     })
 
-    test('finds key starting with pattern using prefix*', () => {
+    test('finds key starting with pattern using regex', () => {
       const result = sg.parse(`
 userName "johndoe"
 userEmail "john@example.com"
 `)
-      expect(result.$find('user*')).toBe('johndoe')
+      expect(result.$find('^user')).toBe('johndoe')
     })
 
-    test('finds key containing pattern using *infix*', () => {
+    test('finds key containing pattern using regex', () => {
       const result = sg.parse(`
 myUserName "johndoe"
 otherValue "test"
 `)
-      expect(result.$find('*User*')).toBe('johndoe')
+      // Use \w*User\w* to match keys containing "User"
+      expect(result.$find('\\w*User\\w*')).toBe('johndoe')
     })
 
-    test('finds wildcard key at any depth', () => {
+    test('finds regex key at any depth', () => {
       const result = sg.parse(`
 user
   details
     firstName "John"
 `)
-      expect(result.$find('*Name')).toBe('John')
+      expect(result.$find('Name$')).toBe('John')
     })
 
-    test('finds wildcard after exact path', () => {
+    test('finds regex after exact path', () => {
       const result = sg.parse(`
 user
   personalInfo
@@ -793,8 +794,8 @@ user
   workInfo
     companyName "ACME"
 `)
-      expect(result.$find('user.personalInfo.*Name')).toBe('John')
-      expect(result.$find('user.workInfo.*Name')).toBe('ACME')
+      expect(result.$find('user.personalInfo.Name$')).toBe('John')
+      expect(result.$find('user.workInfo.Name$')).toBe('ACME')
     })
 
     test('returns undefined for non-existent path', () => {
@@ -803,12 +804,12 @@ user
       expect(result.$find('user.name')).toBeUndefined()
     })
 
-    test('returns undefined for non-matching wildcard', () => {
+    test('returns undefined for non-matching regex', () => {
       const result = sg.parse(`
 firstName "John"
 lastName "Doe"
 `)
-      expect(result.$find('*Email')).toBeUndefined()
+      expect(result.$find('Email$')).toBeUndefined()
     })
 
     test('respects depth option', () => {
@@ -818,9 +819,9 @@ level1
     level3
       deepValue "found"
 `)
-      expect(result.$find('*Value', { depth: 2 })).toBeUndefined()
-      expect(result.$find('*Value', { depth: 4 })).toBe('found')
-      expect(result.$find('*Value')).toBe('found') // default Infinity
+      expect(result.$find('Value$', { depth: 2 })).toBeUndefined()
+      expect(result.$find('Value$', { depth: 4 })).toBe('found')
+      expect(result.$find('Value$')).toBe('found') // default Infinity
     })
 
     test('searches inside arrays', () => {
@@ -836,12 +837,12 @@ items
     name "Second"
 `)
       // Array of primitives returns undefined (no keys to match)
-      expect(result.$find('users.*')).toBeUndefined()
+      expect(result.$find('users.\\w+')).toBeUndefined()
       // Array of objects can be searched
       expect(result.$find('items.item.name')).toBe('First')
     })
 
-    test('finds first match with wildcard', () => {
+    test('finds first match with regex', () => {
       const result = sg.parse(`
 user1
   firstName "Alice"
@@ -849,16 +850,16 @@ user2
   firstName "Bob"
 `)
       // Should return first match
-      expect(result.$find('*Name')).toBe('Alice')
+      expect(result.$find('Name$')).toBe('Alice')
     })
 
-    test('wildcard matches any single key with *', () => {
+    test('regex matches any single key with \\w+', () => {
       const result = sg.parse(`
 config
   database
     host "localhost"
 `)
-      expect(result.$find('config.*.host')).toBe('localhost')
+      expect(result.$find('config.\\w+.host')).toBe('localhost')
     })
 
     test('$find method is non-enumerable', () => {
@@ -875,7 +876,7 @@ firstName "John"
 lastName "Doe"
 middleName "James"
 `)
-      const matches = result.$findAll('*Name')
+      const matches = result.$findAll('Name$')
       expect(matches).toHaveLength(3)
       expect(matches).toContainEqual({ key: 'firstName', value: 'John' })
       expect(matches).toContainEqual({ key: 'lastName', value: 'Doe' })
@@ -889,7 +890,7 @@ user1
 user2
   firstName "Bob"
 `)
-      const matches = result.$findAll('*Name')
+      const matches = result.$findAll('Name$')
       expect(matches).toHaveLength(2)
       expect(matches).toContainEqual({ key: 'user1.firstName', value: 'Alice' })
       expect(matches).toContainEqual({ key: 'user2.firstName', value: 'Bob' })
@@ -902,7 +903,7 @@ company
     team
       memberName "John"
 `)
-      const matches = result.$findAll('*Name')
+      const matches = result.$findAll('Name$')
       expect(matches).toHaveLength(1)
       expect(matches[0]).toEqual({ key: 'company.department.team.memberName', value: 'John' })
     })
@@ -919,7 +920,7 @@ user
       expect(matches[0]).toEqual({ key: 'user.name', value: 'John' })
     })
 
-    test('finds all with wildcard in path', () => {
+    test('finds all with regex in path', () => {
       const result = sg.parse(`
 user
   personalInfo
@@ -928,7 +929,7 @@ user
   workInfo
     jobName "Developer"
 `)
-      const matches = result.$findAll('user.*.*Name')
+      const matches = result.$findAll('user.\\w+.Name$')
       expect(matches).toHaveLength(3)
       expect(matches).toContainEqual({ key: 'user.personalInfo.firstName', value: 'John' })
       expect(matches).toContainEqual({ key: 'user.personalInfo.lastName', value: 'Doe' })
@@ -940,7 +941,7 @@ user
 firstName "John"
 lastName "Doe"
 `)
-      const matches = result.$findAll('*Email')
+      const matches = result.$findAll('Email$')
       expect(matches).toEqual([])
     })
 
@@ -951,11 +952,11 @@ level1
   level2
     firstName "Deep"
 `)
-      const shallow = result.$findAll('*Name', { depth: 2 })
+      const shallow = result.$findAll('Name$', { depth: 2 })
       expect(shallow).toHaveLength(1)
       expect(shallow[0].value).toBe('Shallow')
 
-      const deep = result.$findAll('*Name', { depth: 4 })
+      const deep = result.$findAll('Name$', { depth: 4 })
       expect(deep).toHaveLength(2)
     })
 
@@ -975,7 +976,7 @@ users
       expect(matches[1].value).toBe('Bob')
     })
 
-    test('handles wildcard matching any key', () => {
+    test('handles regex matching any key', () => {
       const result = sg.parse(`
 config
   db
@@ -983,7 +984,7 @@ config
   cache
     host "redis"
 `)
-      const matches = result.$findAll('config.*.host')
+      const matches = result.$findAll('config.\\w+.host')
       expect(matches).toHaveLength(2)
       expect(matches).toContainEqual({ key: 'config.db.host', value: 'localhost' })
       expect(matches).toContainEqual({ key: 'config.cache.host', value: 'redis' })
@@ -993,6 +994,201 @@ config
       const result = sg.parse(`name "John"`)
       expect(Object.keys(result)).toEqual(['name'])
       expect('$findAll' in result).toBe(true)
+    })
+  })
+
+  describe('$findValue', () => {
+    test('finds exact value at root level', () => {
+      const result = sg.parse(`
+name "John"
+age 30
+`)
+      expect(result.$findValue('^John$')).toEqual({ key: 'name', value: 'John' })
+      expect(result.$findValue('^30$')).toEqual({ key: 'age', value: 30 })
+    })
+
+    test('finds value in nested object', () => {
+      const result = sg.parse(`
+user
+  name "John"
+  address
+    city "NYC"
+`)
+      expect(result.$findValue('^John$')).toEqual({ key: 'user.name', value: 'John' })
+      expect(result.$findValue('^NYC$')).toEqual({ key: 'user.address.city', value: 'NYC' })
+    })
+
+    test('finds value ending with pattern using regex', () => {
+      const result = sg.parse(`
+greeting "Hello World"
+farewell "Goodbye World"
+`)
+      expect(result.$findValue('World$')).toEqual({ key: 'greeting', value: 'Hello World' })
+    })
+
+    test('finds value starting with pattern using regex', () => {
+      const result = sg.parse(`
+message "Hello there"
+other "Something else"
+`)
+      expect(result.$findValue('^Hello')).toEqual({ key: 'message', value: 'Hello there' })
+    })
+
+    test('finds value containing pattern using regex', () => {
+      const result = sg.parse(`
+sentence "The quick brown fox"
+other "Something else"
+`)
+      expect(result.$findValue('quick')).toEqual({ key: 'sentence', value: 'The quick brown fox' })
+    })
+
+    test('finds value in arrays', () => {
+      const result = sg.parse(`
+colors ["red", "green", "blue"]
+`)
+      expect(result.$findValue('^green$')).toEqual({ key: 'colors.1', value: 'green' })
+    })
+
+    test('finds numeric values', () => {
+      const result = sg.parse(`
+scores
+  high 100
+  low 10
+`)
+      expect(result.$findValue('^100$')).toEqual({ key: 'scores.high', value: 100 })
+    })
+
+    test('finds boolean values', () => {
+      const result = sg.parse(`
+flags
+  enabled true
+  disabled false
+`)
+      expect(result.$findValue('^true$')).toEqual({ key: 'flags.enabled', value: true })
+      expect(result.$findValue('^false$')).toEqual({ key: 'flags.disabled', value: false })
+    })
+
+    test('returns undefined for non-matching value', () => {
+      const result = sg.parse(`name "John"`)
+      expect(result.$findValue('^Jane$')).toBeUndefined()
+      expect(result.$findValue('Smith$')).toBeUndefined()
+    })
+
+    test('respects depth option', () => {
+      const result = sg.parse(`
+level1
+  level2
+    level3
+      deepValue "found"
+`)
+      expect(result.$findValue('^found$', { depth: 2 })).toBeUndefined()
+      expect(result.$findValue('^found$', { depth: 4 })).toEqual({ key: 'level1.level2.level3.deepValue', value: 'found' })
+    })
+
+    test('finds first match when multiple exist', () => {
+      const result = sg.parse(`
+user1
+  status "active"
+user2
+  status "active"
+`)
+      expect(result.$findValue('^active$')).toEqual({ key: 'user1.status', value: 'active' })
+    })
+
+    test('$findValue method is non-enumerable', () => {
+      const result = sg.parse(`name "John"`)
+      expect(Object.keys(result)).toEqual(['name'])
+      expect('$findValue' in result).toBe(true)
+    })
+  })
+
+  describe('$findAllValues', () => {
+    test('finds all exact matching values', () => {
+      const result = sg.parse(`
+status1 "active"
+status2 "inactive"
+status3 "active"
+`)
+      const matches = result.$findAllValues('^active$')
+      expect(matches).toHaveLength(2)
+      expect(matches).toContainEqual({ key: 'status1', value: 'active' })
+      expect(matches).toContainEqual({ key: 'status3', value: 'active' })
+    })
+
+    test('finds all values with regex pattern', () => {
+      const result = sg.parse(`
+msg1 "Hello World"
+msg2 "Goodbye World"
+msg3 "Hello Universe"
+`)
+      const matches = result.$findAllValues('World$')
+      expect(matches).toHaveLength(2)
+      expect(matches).toContainEqual({ key: 'msg1', value: 'Hello World' })
+      expect(matches).toContainEqual({ key: 'msg2', value: 'Goodbye World' })
+    })
+
+    test('finds all values at any depth', () => {
+      const result = sg.parse(`
+user1
+  status "active"
+user2
+  profile
+    status "active"
+`)
+      const matches = result.$findAllValues('^active$')
+      expect(matches).toHaveLength(2)
+      expect(matches).toContainEqual({ key: 'user1.status', value: 'active' })
+      expect(matches).toContainEqual({ key: 'user2.profile.status', value: 'active' })
+    })
+
+    test('finds values in arrays', () => {
+      const result = sg.parse(`
+fruits ["apple", "banana", "apple"]
+`)
+      const matches = result.$findAllValues('^apple$')
+      expect(matches).toHaveLength(2)
+      expect(matches).toContainEqual({ key: 'fruits.0', value: 'apple' })
+      expect(matches).toContainEqual({ key: 'fruits.2', value: 'apple' })
+    })
+
+    test('finds all numeric values matching pattern', () => {
+      const result = sg.parse(`
+scores
+  score1 100
+  score2 200
+  score3 105
+`)
+      const matches = result.$findAllValues('^10')
+      expect(matches).toHaveLength(2)
+      expect(matches).toContainEqual({ key: 'scores.score1', value: 100 })
+      expect(matches).toContainEqual({ key: 'scores.score3', value: 105 })
+    })
+
+    test('returns empty array when no matches', () => {
+      const result = sg.parse(`name "John"`)
+      const matches = result.$findAllValues('^Jane$')
+      expect(matches).toEqual([])
+    })
+
+    test('respects depth option', () => {
+      const result = sg.parse(`
+level1
+  value "found"
+  level2
+    value "found"
+`)
+      const shallow = result.$findAllValues('^found$', { depth: 2 })
+      expect(shallow).toHaveLength(1)
+      expect(shallow[0].key).toBe('level1.value')
+
+      const deep = result.$findAllValues('^found$', { depth: 4 })
+      expect(deep).toHaveLength(2)
+    })
+
+    test('$findAllValues method is non-enumerable', () => {
+      const result = sg.parse(`name "John"`)
+      expect(Object.keys(result)).toEqual(['name'])
+      expect('$findAllValues' in result).toBe(true)
     })
   })
 

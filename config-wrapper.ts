@@ -15,22 +15,41 @@ export interface FindResult {
   value: unknown
 }
 
-// Shared pattern matching for $find and $findAll
-const matchPattern = (key: string, pattern: string): boolean => {
-  if (pattern === '*') return true
-  if (pattern.startsWith('*') && pattern.endsWith('*') && pattern.length > 2) {
-    return key.includes(pattern.slice(1, -1))
-  }
-  if (pattern.startsWith('*')) {
-    return key.endsWith(pattern.slice(1))
-  }
-  if (pattern.endsWith('*')) {
-    return key.startsWith(pattern.slice(0, -1))
-  }
-  return key === pattern
+/**
+ * Test if a pattern could match multiple keys (requires deep search).
+ * Plain text patterns (no regex metacharacters) are treated as exact matches.
+ * Patterns with regex metacharacters trigger deep searching.
+ */
+const needsDeepSearch = (pattern: string): boolean => {
+  // If no regex metacharacters, it's an exact key name - no deep search needed
+  return /[.+*?^${}()|[\]\\]/.test(pattern)
 }
 
-const hasWildcard = (pattern: string): boolean => pattern.includes('*')
+/**
+ * Shared pattern matching for $find, $findAll, $findValue, $findAllValues.
+ * Uses regex for matching.
+ */
+const matchPattern = (text: string, pattern: string): boolean => {
+  try {
+    const regex = new RegExp(pattern)
+    return regex.test(text)
+  } catch {
+    // Invalid regex - fall back to exact match
+    return text === pattern
+  }
+}
+
+/**
+ * Match a value against a regex pattern.
+ * Values are converted to strings before matching.
+ */
+const matchValue = (value: unknown, pattern: string): boolean => {
+  if (value === null || value === undefined) return false
+  if (typeof value === 'object') return false // Don't match objects/arrays
+
+  const strValue = String(value)
+  return matchPattern(strValue, pattern)
+}
 
 /**
  * Shared traversal logic for $find and $findAll.
@@ -71,7 +90,7 @@ const traverseFind = (
       return false
     }
 
-    if (hasWildcard(pattern)) {
+    if (needsDeepSearch(pattern)) {
       // Search current level first
       for (const key of Object.keys(obj)) {
         if (matchPattern(key, pattern)) {
@@ -101,6 +120,55 @@ const traverseFind = (
   }
 
   traverse(data, 0, 0, [])
+}
+
+/**
+ * Traversal logic for $findValue and $findAllValues.
+ * Searches for values matching a pattern throughout the object graph.
+ */
+const traverseFindValue = (
+  data: unknown,
+  pattern: string,
+  maxDepth: number,
+  collector: (path: string[], value: unknown) => boolean // return true to stop early
+): void => {
+  const traverse = (
+    obj: unknown,
+    currentDepth: number,
+    pathParts: string[]
+  ): boolean => {
+    // Depth exceeded
+    if (currentDepth > maxDepth) return false
+
+    // Check if current value matches
+    if (matchValue(obj, pattern)) {
+      return collector(pathParts, obj)
+    }
+
+    // Can't search deeper
+    if (obj === null || typeof obj !== 'object') return false
+
+    // Handle arrays
+    if (Array.isArray(obj)) {
+      for (let i = 0; i < obj.length; i++) {
+        if (traverse(obj[i], currentDepth + 1, [...pathParts, String(i)])) {
+          return true
+        }
+      }
+      return false
+    }
+
+    // Handle objects
+    for (const key of Object.keys(obj)) {
+      if (traverse((obj as Record<string, unknown>)[key], currentDepth + 1, [...pathParts, key])) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  traverse(data, 0, [])
 }
 
 /**
@@ -182,6 +250,8 @@ const deepFreeze = <T>(obj: T): T => {
 interface ConfigMethods<T> {
   $find: (query: string, options?: FindOptions) => unknown
   $findAll: (query: string, options?: FindOptions) => FindResult[]
+  $findValue: (pattern: string, options?: FindOptions) => FindResult | undefined
+  $findAllValues: (pattern: string, options?: FindOptions) => FindResult[]
   $clone: (query?: string, options?: FindOptions) => unknown
   $freeze: () => T
 }
@@ -216,6 +286,30 @@ const createMethods = <T>(data: T): ConfigMethods<T> => ({
     return results
   },
 
+  $findValue: (pattern: string, options?: FindOptions): FindResult | undefined => {
+    const maxDepth = options?.depth ?? Infinity
+    let result: FindResult | undefined
+
+    traverseFindValue(data, pattern, maxDepth, (path, value) => {
+      result = { key: path.join('.'), value }
+      return true // Stop at first match
+    })
+
+    return result
+  },
+
+  $findAllValues: (pattern: string, options?: FindOptions): FindResult[] => {
+    const maxDepth = options?.depth ?? Infinity
+    const results: FindResult[] = []
+
+    traverseFindValue(data, pattern, maxDepth, (path, value) => {
+      results.push({ key: path.join('.'), value })
+      return false // Continue to find all
+    })
+
+    return results
+  },
+
   $clone: (query?: string, options?: FindOptions): unknown => {
     if (query === undefined) {
       return deepClone(data)
@@ -240,7 +334,7 @@ const createMethods = <T>(data: T): ConfigMethods<T> => ({
 })
 
 // Method names for the proxy handler
-const METHOD_NAMES = ['$find', '$findAll', '$clone', '$freeze'] as const
+const METHOD_NAMES = ['$find', '$findAll', '$findValue', '$findAllValues', '$clone', '$freeze'] as const
 
 /**
  * Wraps parsed data in a Proxy that exposes utility methods.
