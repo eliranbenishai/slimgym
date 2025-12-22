@@ -1192,6 +1192,138 @@ level1
     })
   })
 
+  describe('$forEach', () => {
+    test('iterates over object keys', () => {
+      const result = sg.parse(`
+name "John"
+age 30
+city "NYC"
+`)
+      const collected: { key: string; value: unknown }[] = []
+      result.$forEach((value, key) => {
+        collected.push({ key: key as string, value })
+      })
+      expect(collected).toHaveLength(3)
+      expect(collected).toContainEqual({ key: 'name', value: 'John' })
+      expect(collected).toContainEqual({ key: 'age', value: 30 })
+      expect(collected).toContainEqual({ key: 'city', value: 'NYC' })
+    })
+
+    test('iterates over root with array property', () => {
+      // $forEach iterates the root object keys
+      const result = sg.parse(`
+items ["a", "b", "c"]
+count 3
+`)
+      const keys: string[] = []
+      result.$forEach((_value, key) => {
+        keys.push(key as string)
+      })
+      expect(keys).toEqual(['items', 'count'])
+
+      // For the array itself, use native forEach
+      const values: unknown[] = []
+      result.items.forEach((value: unknown) => {
+        values.push(value)
+      })
+      expect(values).toEqual(['a', 'b', 'c'])
+    })
+
+    test('provides parent as third argument', () => {
+      const result = sg.parse(`
+name "John"
+age 30
+`)
+      let capturedParent: unknown
+      result.$forEach((_value, _key, parent) => {
+        capturedParent = parent
+      })
+      // Parent should have same structure (proxy wraps the original)
+      expect(capturedParent).toStrictEqual({ name: 'John', age: 30 })
+    })
+
+    test('iterates in key order for objects', () => {
+      const result = sg.parse(`
+alpha "first"
+beta "second"
+gamma "third"
+`)
+      const keys: string[] = []
+      result.$forEach((_value, key) => {
+        keys.push(key as string)
+      })
+      expect(keys).toEqual(['alpha', 'beta', 'gamma'])
+    })
+
+    test('nested arrays use native forEach', () => {
+      const result = sg.parse(`
+items ["x", "y", "z"]
+`)
+      // Nested arrays have native forEach method
+      const indices: number[] = []
+      result.items.forEach((_value: unknown, index: number) => {
+        indices.push(index)
+      })
+      expect(indices).toEqual([0, 1, 2])
+    })
+
+    test('can iterate nested objects with Object.entries', () => {
+      const result = sg.parse(`
+user
+  name "John"
+  age 30
+`)
+      // Nested objects can use Object.entries/Object.keys
+      const collected: string[] = []
+      for (const key of Object.keys(result.user)) {
+        collected.push(key)
+      }
+      expect(collected).toEqual(['name', 'age'])
+    })
+
+    test('works with mixed content at root', () => {
+      const result = sg.parse(`
+users
+  user
+    name "Alice"
+  user
+    name "Bob"
+settings
+  theme "dark"
+`)
+      const topKeys: string[] = []
+      result.$forEach((_value, key) => {
+        topKeys.push(key as string)
+      })
+      expect(topKeys).toEqual(['users', 'settings'])
+
+      // For the nested array, use native forEach
+      const names: string[] = []
+      result.users.user.forEach((item: { name: string }) => {
+        names.push(item.name)
+      })
+      expect(names).toEqual(['Alice', 'Bob'])
+    })
+
+    test('$forEach method is non-enumerable', () => {
+      const result = sg.parse(`name "John"`)
+      expect(Object.keys(result)).toEqual(['name'])
+      expect('$forEach' in result).toBe(true)
+    })
+
+    test('does nothing for primitive values', () => {
+      const result = sg.parse(`name "John"`)
+      // Accessing a primitive and calling $forEach should not throw
+      // (though it won't do anything meaningful)
+      let callCount = 0
+      // @ts-expect-error - testing edge case with primitive
+      result.name?.$forEach?.(() => {
+        callCount++
+      })
+      expect(callCount).toBe(0)
+    })
+  })
+
   describe('$freeze', () => {
     test('freezes simple objects', () => {
       const result = sg.parse(`

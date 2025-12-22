@@ -24,6 +24,9 @@ An indentation-based configuration format that combines clean syntax with modern
   - [`slimgify(obj: any): string`](#slimgifyobj-any-string)
   - [`$find(query, options?)`](#findquery-options)
   - [`$findAll(query, options?)`](#findallquery-options)
+  - [`$findValue(pattern, options?)`](#findvaluepattern-options)
+  - [`$findAllValues(pattern, options?)`](#findallvaluespattern-options)
+  - [`$forEach(callback)`](#foreachcallback)
   - [`$clone(query?, options?)`](#clonequery-options)
   - [`$freeze()`](#freeze)
 - [TypeScript](#typescript)
@@ -266,7 +269,7 @@ Multi-line strings automatically become block strings. Large arrays use multi-li
 
 ### `$find(query, options?)`
 
-Search for a value using a query string with optional wildcard patterns:
+Search for a value using a query string with regex patterns:
 
 ```typescript
 const config = sg.parse(`
@@ -278,28 +281,41 @@ user
     companyName "ACME"
 `)
 
-// Exact path
+// Exact path (no regex metacharacters)
 config.$find('user.personalInfo.firstName') // "John"
 
-// Wildcard: *suffix matches keys ending with pattern
-config.$find('*Name')                        // "John" (first match at any depth)
-config.$find('user.workInfo.*Name')          // "ACME"
+// Regex: Name$ matches keys ending with "Name"
+config.$find('Name$')                        // "John" (first match at any depth)
+config.$find('user.workInfo.Name$')          // "ACME"
 
-// Wildcard: prefix* matches keys starting with pattern
-config.$find('first*')                       // "John"
+// Regex: ^first matches keys starting with "first"
+config.$find('^first')                       // "John"
 
-// Wildcard: *infix* matches keys containing pattern
-config.$find('*Name*')                       // "John"
+// Regex: contains pattern (any key containing "Name")
+config.$find('\\w*Name\\w*')                 // "John"
 
-// Single wildcard matches any key
-config.$find('user.*.firstName')             // "John"
+// Regex: \w+ matches any key (word characters)
+config.$find('user.\\w+.firstName')          // "John"
 ```
+
+**Pattern Matching:**
+- Patterns without regex metacharacters are treated as **exact key names**
+- Patterns with regex metacharacters trigger **deep searching** at all depths
+- Use `\\w+` (not `.+`) to match "any key" since `.` is the path separator
+
+**Common Patterns:**
+| Pattern | Matches |
+|---------|---------|
+| `Name$` | Keys ending with "Name" |
+| `^user` | Keys starting with "user" |
+| `\\w+` | Any key (word characters) |
+| `^exact$` | Exactly "exact" |
 
 **Options:**
 - `depth` - Maximum depth to search (default: `Infinity`)
 
 ```typescript
-config.$find('*Name', { depth: 2 }) // Only search 2 levels deep
+config.$find('Name$', { depth: 2 }) // Only search 2 levels deep
 ```
 
 ### `$findAll(query, options?)`
@@ -314,7 +330,7 @@ user2
   firstName "Bob"
 `)
 
-config.$findAll('*Name')
+config.$findAll('Name$')
 // [
 //   { key: 'user1.firstName', value: 'Alice' },
 //   { key: 'user2.firstName', value: 'Bob' }
@@ -324,6 +340,117 @@ config.$findAll('*Name')
 The `key` field contains the full path to the match, including array indices when searching through arrays.
 
 **Options:** Same as `$find` — use `depth` to limit search depth.
+
+### `$findValue(pattern, options?)`
+
+Search for the first **value** matching a regex pattern (instead of searching by key):
+
+```typescript
+const config = sg.parse(`
+user
+  email "john@example.com"
+  status "active"
+settings
+  mode "active"
+`)
+
+// Find first value matching pattern
+config.$findValue('^active$')      // { key: 'user.status', value: 'active' }
+config.$findValue('@example\\.com') // { key: 'user.email', value: 'john@example.com' }
+
+// Partial match (regex does partial matching by default)
+config.$findValue('active')         // { key: 'user.status', value: 'active' }
+
+// No match returns undefined
+config.$findValue('^admin$')        // undefined
+```
+
+Returns `{ key, value }` for the first match, or `undefined` if no match found.
+
+**Options:**
+- `depth` - Maximum depth to search (default: `Infinity`)
+
+### `$findAllValues(pattern, options?)`
+
+Like `$findValue`, but returns **all** matching values:
+
+```typescript
+const config = sg.parse(`
+user
+  status "active"
+admin
+  status "active"
+guest
+  status "inactive"
+`)
+
+config.$findAllValues('^active$')
+// [
+//   { key: 'user.status', value: 'active' },
+//   { key: 'admin.status', value: 'active' }
+// ]
+```
+
+Works with all value types (numbers, booleans converted to strings for matching):
+
+```typescript
+const config = sg.parse(`
+scores
+  high 100
+  medium 50
+  low 10
+`)
+
+config.$findAllValues('^10')  // Matches 100 and 10
+// [
+//   { key: 'scores.high', value: 100 },
+//   { key: 'scores.low', value: 10 }
+// ]
+```
+
+**Options:** Same as `$findValue` — use `depth` to limit search depth.
+
+### `$forEach(callback)`
+
+Iterate over the keys (for objects) or elements (for arrays) of the root parsed object:
+
+```typescript
+const config = sg.parse(`
+name "John"
+age 30
+city "NYC"
+`)
+
+// Iterate over object keys
+config.$forEach((value, key, parent) => {
+  console.log(`${key}: ${value}`)
+})
+// Output:
+// name: John
+// age: 30
+// city: NYC
+
+// Collect all keys
+const keys: string[] = []
+config.$forEach((_, key) => keys.push(key as string))
+// keys: ['name', 'age', 'city']
+```
+
+**Callback Signature:**
+- For objects: `(value, key, parent) => void`
+- For arrays: `(value, index, parent) => void`
+
+**Note:** `$forEach` is available on the **root parsed object** only. For nested arrays, use the native `forEach`:
+
+```typescript
+config.items.forEach((item, index) => { ... })
+```
+
+For nested objects, use `Object.keys()` or `Object.entries()`:
+
+```typescript
+for (const [key, value] of Object.entries(config.user)) { ... }
+```
 
 ### `$clone(query?, options?)`
 
@@ -346,11 +473,11 @@ config.user.name  // "John" (unchanged)
 config.user.tags  // ["admin", "active"] (unchanged)
 ```
 
-Clone only a portion (supports wildcards + `depth`, same as `$find`):
+Clone only a portion (supports regex patterns + `depth`, same as `$find`):
 
 ```typescript
 const tagsCopy = config.$clone('user.tags')      // ["admin", "active"]
-const firstNameCopy = config.$clone('*name')     // "John" (first match, cloned)
+const nameCopy = config.$clone('name$')          // "John" (first match ending with "name", cloned)
 ```
 
 If the selector does not match anything, `$clone(query)` returns `undefined`.
@@ -376,7 +503,7 @@ config.user.tags.push("new")  // Throws in strict mode
 
 The `$freeze` method recursively applies `Object.freeze()` to the entire object tree, including nested objects and arrays. Returns the locked object for chaining.
 
-> **Note:** Method names use a `$` prefix (e.g., `$find`, `$findAll`, `$clone`, `$freeze`) because `$` is not a valid character in SlimGym keys. This guarantees that library methods will never conflict with your data keys.
+> **Note:** Method names use a `$` prefix (e.g., `$find`, `$findAll`, `$findValue`, `$findAllValues`, `$forEach`, `$clone`, `$freeze`) because `$` is not a valid character in SlimGym keys. This guarantees that library methods will never conflict with your data keys.
 
 ## TypeScript
 
@@ -403,7 +530,7 @@ import { parse, file, fileAsync, fetch } from 'slimgym/parse'
 import { slimgify } from 'slimgym/slimgify'
 ```
 
-**Exported Types:** `NodeObject`, `NodeValue`, `Primitive`, `ParseError`, `ParseOptions`, `FetchOptions`, `FetchUrlOptions`, `FindOptions`, `FindResult`
+**Exported Types:** `NodeObject`, `NodeValue`, `Primitive`, `ParseError`, `ParseOptions`, `FetchOptions`, `FetchUrlOptions`, `FindOptions`, `FindResult`, `ForEachCallback`
 
 ## Error Handling
 

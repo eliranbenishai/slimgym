@@ -247,11 +247,23 @@ const deepFreeze = <T>(obj: T): T => {
   return Object.freeze(obj)
 }
 
+/**
+ * Callback for $forEach iteration.
+ * For arrays: (value, index, array)
+ * For objects: (value, key, object)
+ */
+export type ForEachCallback<T> = (
+  value: unknown,
+  keyOrIndex: T extends unknown[] ? number : string,
+  parent: T
+) => void
+
 interface ConfigMethods<T> {
   $find: (query: string, options?: FindOptions) => unknown
   $findAll: (query: string, options?: FindOptions) => FindResult[]
   $findValue: (pattern: string, options?: FindOptions) => FindResult | undefined
   $findAllValues: (pattern: string, options?: FindOptions) => FindResult[]
+  $forEach: (callback: ForEachCallback<T>) => void
   $clone: (query?: string, options?: FindOptions) => unknown
   $freeze: () => T
 }
@@ -310,6 +322,24 @@ const createMethods = <T>(data: T): ConfigMethods<T> => ({
     return results
   },
 
+  $forEach: (callback: ForEachCallback<T>): void => {
+    if (data === null || typeof data !== 'object') return
+
+    if (Array.isArray(data)) {
+      for (let i = 0; i < data.length; i++) {
+        callback(data[i], i as T extends unknown[] ? number : string, data)
+      }
+    } else {
+      for (const key of Object.keys(data)) {
+        callback(
+          (data as Record<string, unknown>)[key],
+          key as T extends unknown[] ? number : string,
+          data
+        )
+      }
+    }
+  },
+
   $clone: (query?: string, options?: FindOptions): unknown => {
     if (query === undefined) {
       return deepClone(data)
@@ -334,7 +364,7 @@ const createMethods = <T>(data: T): ConfigMethods<T> => ({
 })
 
 // Method names for the proxy handler
-const METHOD_NAMES = ['$find', '$findAll', '$findValue', '$findAllValues', '$clone', '$freeze'] as const
+const METHOD_NAMES = ['$find', '$findAll', '$findValue', '$findAllValues', '$forEach', '$clone', '$freeze'] as const
 
 /**
  * Wraps parsed data in a Proxy that exposes utility methods.
