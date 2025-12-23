@@ -867,6 +867,73 @@ config
       expect(Object.keys(result)).toEqual(['name'])
       expect('$find' in result).toBe(true)
     })
+
+    test('handles invalid regex by falling back to exact match', () => {
+      const result = sg.parse(`
+name "John"
+other "value"
+`)
+      // Invalid regex pattern - should fall back to exact match behavior
+      // "[invalid" is invalid regex, falls back to trying exact key match
+      expect(result.$find('[invalid')).toBeUndefined()
+      expect(result.$find('name')).toBe('John')
+    })
+
+    test('handles empty pattern as exact match for empty key', () => {
+      const result = sg.parse(`name "John"`)
+      // Empty pattern without regex metacharacters is treated as exact match
+      // No key named "" exists, so returns undefined
+      expect(result.$find('')).toBeUndefined()
+      // To match any key, use a regex pattern
+      expect(result.$find('\\w+')).toBe('John')
+    })
+
+    test('handles special regex characters that need escaping', () => {
+      const result = sg.parse(`
+version "1.0.0"
+path "/home/user"
+`)
+      // Unescaped . matches any character
+      expect(result.$find('version')).toBe('1.0.0')
+      // The value contains special chars but we're matching keys
+    })
+
+    test('handles case-sensitive regex', () => {
+      const result = sg.parse(`
+firstName "John"
+LASTNAME "DOE"
+`)
+      expect(result.$find('NAME$')).toBe('DOE')
+      expect(result.$find('Name$')).toBe('John')
+    })
+
+    test('works with numeric keys in path', () => {
+      const result = sg.parse(`
+users
+  user
+    id 1
+  user
+    id 2
+`)
+      // After repeated keys become array, numeric indices are in path
+      expect(result.$find('users.user.id')).toBe(1)
+    })
+
+    test('handles complex nested arrays of objects', () => {
+      const result = sg.parse(`
+data
+  items
+    item
+      nested
+        value "deep1"
+    item
+      nested
+        value "deep2"
+`)
+      // Plain 'value' is exact match - use regex to search at any depth
+      expect(result.$find('^value$')).toBe('deep1')
+      expect(result.$find('data.items.item.nested.value')).toBe('deep1')
+    })
   })
 
   describe('$findAll', () => {
@@ -995,6 +1062,54 @@ config
       expect(Object.keys(result)).toEqual(['name'])
       expect('$findAll' in result).toBe(true)
     })
+
+    test('handles invalid regex gracefully', () => {
+      const result = sg.parse(`name "John"`)
+      // Invalid regex falls back to exact match - no key named "[invalid"
+      const matches = result.$findAll('[invalid')
+      expect(matches).toEqual([])
+    })
+
+    test('returns matches in traversal order', () => {
+      const result = sg.parse(`
+a
+  name "first"
+b
+  name "second"
+c
+  name "third"
+`)
+      // Use regex pattern to trigger deep search
+      const matches = result.$findAll('^name$')
+      expect(matches).toHaveLength(3)
+      expect(matches[0].value).toBe('first')
+      expect(matches[1].value).toBe('second')
+      expect(matches[2].value).toBe('third')
+    })
+
+    test('handles deeply nested structures with arrays', () => {
+      const result = sg.parse(`
+root
+  level1
+    item
+      id 1
+    item
+      id 2
+  level2
+    item
+      id 3
+`)
+      // Use regex pattern to trigger deep search
+      const matches = result.$findAll('^id$')
+      expect(matches).toHaveLength(3)
+      expect(matches.map(m => m.value)).toEqual([1, 2, 3])
+    })
+
+    test('handles empty object', () => {
+      const result = sg.parse(``)
+      const matches = result.$findAll('anything')
+      expect(matches).toEqual([])
+    })
   })
 
   describe('$findValue', () => {
@@ -1100,6 +1215,124 @@ user2
       expect(Object.keys(result)).toEqual(['name'])
       expect('$findValue' in result).toBe(true)
     })
+
+    test('does not match null values', () => {
+      const result = sg.parse(`
+value null
+other "test"
+`)
+      expect(result.$findValue('null')).toBeUndefined()
+      expect(result.$findValue('^test$')).toEqual({ key: 'other', value: 'test' })
+    })
+
+    test('does not match undefined values', () => {
+      const result = sg.parse(`
+value undefined
+other "test"
+`)
+      expect(result.$findValue('undefined')).toBeUndefined()
+    })
+
+    test('does not match object values', () => {
+      const result = sg.parse(`
+user
+  name "John"
+other "test"
+`)
+      // Objects themselves are not matched, only their leaf values
+      expect(result.$findValue('\\{.*\\}')).toBeUndefined()
+      expect(result.$findValue('^John$')).toEqual({ key: 'user.name', value: 'John' })
+    })
+
+    test('matches empty string values', () => {
+      const result = sg.parse(`
+empty ""
+other "value"
+`)
+      expect(result.$findValue('^$')).toEqual({ key: 'empty', value: '' })
+    })
+
+    test('matches negative numbers', () => {
+      const result = sg.parse(`
+temp -10
+balance -500.50
+`)
+      expect(result.$findValue('^-10$')).toEqual({ key: 'temp', value: -10 })
+      expect(result.$findValue('^-500')).toEqual({ key: 'balance', value: -500.5 })
+    })
+
+    test('matches float/decimal numbers', () => {
+      const result = sg.parse(`
+pi 3.14159
+rate 0.05
+`)
+      expect(result.$findValue('3\\.14')).toEqual({ key: 'pi', value: 3.14159 })
+      expect(result.$findValue('^0\\.05$')).toEqual({ key: 'rate', value: 0.05 })
+    })
+
+    test('matches date values as strings', () => {
+      const result = sg.parse(`
+created 2025-01-15
+`)
+      // Dates are parsed as Date objects and converted to ISO string for matching
+      // Date.toString() produces full ISO format like "2025-01-15T00:00:00.000Z"
+      const match = result.$findValue('2025-01-15')
+      expect(match).toBeDefined()
+      expect(match?.key).toBe('created')
+      // The value is a Date object
+      expect(match?.value).toBeInstanceOf(Date)
+    })
+
+    test('handles invalid regex gracefully', () => {
+      const result = sg.parse(`name "John"`)
+      // Invalid regex falls back to exact match
+      expect(result.$findValue('[invalid')).toBeUndefined()
+    })
+
+    test('searches in nested arrays of objects', () => {
+      const result = sg.parse(`
+users
+  user
+    status "active"
+  user
+    status "inactive"
+  user
+    status "active"
+`)
+      expect(result.$findValue('^inactive$')).toEqual({ key: 'users.user.1.status', value: 'inactive' })
+    })
+
+    test('handles special characters in values', () => {
+      const result = sg.parse(`
+email "user@example.com"
+path "/home/user/.config"
+regex ".*pattern.*"
+`)
+      // Need to escape special regex chars to match literally
+      expect(result.$findValue('@example\\.com$')).toEqual({ key: 'email', value: 'user@example.com' })
+      expect(result.$findValue('^\\.\\*pattern')).toEqual({ key: 'regex', value: '.*pattern.*' })
+    })
+
+    test('handles unicode values', () => {
+      const result = sg.parse(`
+greeting "こんにちは"
+other "hello"
+`)
+      expect(result.$findValue('こんにちは')).toEqual({ key: 'greeting', value: 'こんにちは' })
+    })
+
+    test('finds values with line breaks in block strings', () => {
+      const result = sg.parse(`
+message """
+  Line 1
+  Line 2
+"""
+`)
+      // Block strings preserve line breaks
+      const match = result.$findValue('Line 1')
+      expect(match).toBeDefined()
+      expect(match?.key).toBe('message')
+    })
   })
 
   describe('$findAllValues', () => {
@@ -1189,6 +1422,125 @@ level1
       const result = sg.parse(`name "John"`)
       expect(Object.keys(result)).toEqual(['name'])
       expect('$findAllValues' in result).toBe(true)
+    })
+
+    test('does not match null or undefined values', () => {
+      const result = sg.parse(`
+a null
+b undefined
+c "real"
+`)
+      const matches = result.$findAllValues('null|undefined')
+      expect(matches).toEqual([])
+    })
+
+    test('matches all boolean values', () => {
+      const result = sg.parse(`
+flag1 true
+flag2 false
+flag3 true
+`)
+      const trueMatches = result.$findAllValues('^true$')
+      expect(trueMatches).toHaveLength(2)
+      expect(trueMatches).toContainEqual({ key: 'flag1', value: true })
+      expect(trueMatches).toContainEqual({ key: 'flag3', value: true })
+    })
+
+    test('finds all empty strings', () => {
+      const result = sg.parse(`
+a ""
+b "value"
+c ""
+`)
+      const matches = result.$findAllValues('^$')
+      expect(matches).toHaveLength(2)
+      expect(matches).toContainEqual({ key: 'a', value: '' })
+      expect(matches).toContainEqual({ key: 'c', value: '' })
+    })
+
+    test('handles complex regex patterns', () => {
+      const result = sg.parse(`
+email1 "alice@company.com"
+email2 "bob@company.org"
+email3 "charlie@other.com"
+phone "555-1234"
+`)
+      // Match all .com emails
+      const matches = result.$findAllValues('@.*\\.com$')
+      expect(matches).toHaveLength(2)
+      expect(matches).toContainEqual({ key: 'email1', value: 'alice@company.com' })
+      expect(matches).toContainEqual({ key: 'email3', value: 'charlie@other.com' })
+    })
+
+    test('handles deeply nested values', () => {
+      const result = sg.parse(`
+a
+  b
+    c
+      d
+        value "deep"
+  e
+    value "shallow"
+`)
+      const matches = result.$findAllValues('^deep$|^shallow$')
+      expect(matches).toHaveLength(2)
+    })
+
+    test('returns matches in traversal order', () => {
+      const result = sg.parse(`
+first "match"
+second "match"
+third "match"
+`)
+      const matches = result.$findAllValues('^match$')
+      expect(matches).toHaveLength(3)
+      expect(matches[0].key).toBe('first')
+      expect(matches[1].key).toBe('second')
+      expect(matches[2].key).toBe('third')
+    })
+
+    test('handles mixed numeric patterns', () => {
+      const result = sg.parse(`
+a 100
+b -100
+c 100.5
+d 1000
+`)
+      // Match exactly 100 or -100
+      const matches = result.$findAllValues('^-?100$')
+      expect(matches).toHaveLength(2)
+      expect(matches).toContainEqual({ key: 'a', value: 100 })
+      expect(matches).toContainEqual({ key: 'b', value: -100 })
+    })
+
+    test('handles invalid regex gracefully', () => {
+      const result = sg.parse(`name "John"`)
+      const matches = result.$findAllValues('[invalid')
+      expect(matches).toEqual([])
+    })
+
+    test('finds all date values', () => {
+      const result = sg.parse(`
+start 2025-01-01
+end 2025-12-31
+name "not a date"
+`)
+      // Match ISO date format in Date strings
+      const matches = result.$findAllValues('2025-')
+      expect(matches).toHaveLength(2)
+      expect(matches[0].key).toBe('start')
+      expect(matches[1].key).toBe('end')
+    })
+
+    test('handles unicode values', () => {
+      const result = sg.parse(`
+greeting "こんにちは"
+emoji "🎉"
+mixed "Hello 世界"
+`)
+      const matches = result.$findAllValues('世界')
+      expect(matches).toHaveLength(1)
+      expect(matches[0].key).toBe('mixed')
     })
   })
 
@@ -1321,6 +1673,100 @@ settings
         callCount++
       })
       expect(callCount).toBe(0)
+    })
+
+    test('handles empty object', () => {
+      const result = sg.parse(``)
+      let callCount = 0
+      result.$forEach(() => {
+        callCount++
+      })
+      expect(callCount).toBe(0)
+    })
+
+    test('handles object with single key', () => {
+      const result = sg.parse(`only "value"`)
+      const collected: string[] = []
+      result.$forEach((value, key) => {
+        collected.push(`${key}=${value}`)
+      })
+      expect(collected).toEqual(['only=value'])
+    })
+
+    test('callback receives correct types', () => {
+      const result = sg.parse(`
+str "hello"
+num 42
+bool true
+nil null
+`)
+      const types: string[] = []
+      result.$forEach((value) => {
+        types.push(typeof value)
+      })
+      expect(types).toEqual(['string', 'number', 'boolean', 'object'])
+    })
+
+    test('handles nested object values', () => {
+      const result = sg.parse(`
+user
+  name "John"
+settings
+  theme "dark"
+`)
+      const values: unknown[] = []
+      result.$forEach((value) => {
+        values.push(value)
+      })
+      expect(values).toHaveLength(2)
+      expect(values[0]).toEqual({ name: 'John' })
+      expect(values[1]).toEqual({ theme: 'dark' })
+    })
+
+    test('handles array values at root', () => {
+      const result = sg.parse(`
+numbers [1, 2, 3]
+letters ["a", "b", "c"]
+`)
+      const arrays: unknown[] = []
+      result.$forEach((value) => {
+        arrays.push(value)
+      })
+      expect(arrays).toHaveLength(2)
+      expect(arrays[0]).toEqual([1, 2, 3])
+      expect(arrays[1]).toEqual(['a', 'b', 'c'])
+    })
+
+    test('iteration order matches insertion order', () => {
+      const result = sg.parse(`
+z "last"
+a "first"
+m "middle"
+`)
+      const keys: string[] = []
+      result.$forEach((_, key) => {
+        keys.push(key as string)
+      })
+      // Object.keys preserves insertion order for non-integer keys
+      expect(keys).toEqual(['z', 'a', 'm'])
+    })
+
+    test('can be used with type narrowing', () => {
+      const result = sg.parse(`
+count 10
+name "test"
+`)
+      const strings: string[] = []
+      const numbers: number[] = []
+      result.$forEach((value) => {
+        if (typeof value === 'string') {
+          strings.push(value)
+        } else if (typeof value === 'number') {
+          numbers.push(value)
+        }
+      })
+      expect(strings).toEqual(['test'])
+      expect(numbers).toEqual([10])
     })
   })
 

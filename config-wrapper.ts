@@ -42,10 +42,18 @@ const matchPattern = (text: string, pattern: string): boolean => {
 /**
  * Match a value against a regex pattern.
  * Values are converted to strings before matching.
+ * Date objects are converted to ISO strings.
  */
 const matchValue = (value: unknown, pattern: string): boolean => {
   if (value === null || value === undefined) return false
-  if (typeof value === 'object') return false // Don't match objects/arrays
+
+  // Handle Date objects specially - convert to ISO string
+  if (value instanceof Date) {
+    return matchPattern(value.toISOString(), pattern)
+  }
+
+  // Don't match other objects/arrays
+  if (typeof value === 'object') return false
 
   const strValue = String(value)
   return matchPattern(strValue, pattern)
