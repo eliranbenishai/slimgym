@@ -1668,7 +1668,6 @@ settings
       // Accessing a primitive and calling $forEach should not throw
       // (though it won't do anything meaningful)
       let callCount = 0
-      // @ts-expect-error - testing edge case with primitive
       result.name?.$forEach?.(() => {
         callCount++
       })
