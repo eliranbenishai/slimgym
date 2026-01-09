@@ -30,6 +30,7 @@
     "build": "bun run tsc",
     "lint": "bun run eslint .",
     "lint:fix": "bun run eslint . --fix",
+    "typecheck": "bun run tsc --noEmit",
     "prepublishOnly": "bun run build",
     "npm:clean": "unset npm_config_npm-globalconfig npm_config_verify-deps-before-run npm_config__jsr-registry 2>/dev/null || true",
     "publish:unversioned": "bun run build && bash -c 'unset npm_config_npm-globalconfig npm_config_verify-deps-before-run npm_config__jsr-registry; npm publish'",

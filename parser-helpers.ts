@@ -420,7 +420,7 @@ const parseImport = (token: string, options?: ParseOptions, lineNumber?: number,
       const newAncestors = new Set(options?._ancestors ?? [])
       newAncestors.add(absolutePath)
 
-      parsed = parseFunction(content, {
+      parsed = parseFunction<NodeValue>(content, {
         baseDir: path.dirname(absolutePath),
         maxDepth: options?.maxDepth,
         maxArraySize: options?.maxArraySize,
@@ -429,7 +429,7 @@ const parseImport = (token: string, options?: ParseOptions, lineNumber?: number,
         _importDepth: currentImportDepth + 1,
         _sandboxDir: options?._sandboxDir,
         _importCache: cache,
-      }) as NodeValue
+      })
 
       // Store in cache for reuse
       cache?.set(absolutePath, parsed)
