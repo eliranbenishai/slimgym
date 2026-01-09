@@ -84,6 +84,11 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
   const maxDepth = options?.maxDepth ?? DEFAULT_MAX_DEPTH
   const maxArraySize = options?.maxArraySize ?? DEFAULT_MAX_ARRAY_SIZE
 
+  // Initialize import cache at root level to reuse parsed files
+  const effectiveOptions: ParseOptions = options?._importCache
+    ? options
+    : { ...options, _importCache: new Map() }
+
   const len = input.length
   let pos = 0
   let lineIndex = 0
@@ -92,7 +97,7 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
   const stack: { indent: number; obj: NodeObject }[] = [{ indent: -1, obj: root }]
 
   const parseValueWithOptions = (token: string, lineNumber?: number, line?: string): NodeValue => {
-    return parseValue(token, options, lineNumber, line)
+    return parseValue(token, effectiveOptions, lineNumber, line)
   }
 
   while (pos < len) {

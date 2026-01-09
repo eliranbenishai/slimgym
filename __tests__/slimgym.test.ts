@@ -2248,6 +2248,622 @@ key2 ["b"]
         fs.unlinkSync(tempFile)
       }
     })
+
+    describe('nested @@ imports', () => {
+      test('chains @@ imports through multiple files (3 levels)', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-nested-unwrap-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const middleFile = path.join(tempDir, 'middle.sg')
+        const leafFile = path.join(tempDir, 'leaf.sg')
+
+        // leaf.sg: contains the actual array
+        fs.writeFileSync(leafFile, 'items ["a", "b", "c"]')
+        // middle.sg: unwraps leaf.sg
+        fs.writeFileSync(middleFile, `list @@"./leaf.sg"`)
+        // root.sg: unwraps middle.sg
+        fs.writeFileSync(rootFile, `data @@"./middle.sg"`)
+
+        try {
+          const result = sg.file(rootFile)
+          expect(result.data).toEqual(['a', 'b', 'c'])
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(middleFile)
+          fs.unlinkSync(leafFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('chains @@ imports through 4 levels', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-deep-unwrap-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const level1 = path.join(tempDir, 'level1.sg')
+        const level2 = path.join(tempDir, 'level2.sg')
+        const level3 = path.join(tempDir, 'level3.sg')
+        const level4 = path.join(tempDir, 'level4.sg')
+
+        fs.writeFileSync(level4, 'values [1, 2, 3, 4, 5]')
+        fs.writeFileSync(level3, `nums @@"./level4.sg"`)
+        fs.writeFileSync(level2, `arr @@"./level3.sg"`)
+        fs.writeFileSync(level1, `result @@"./level2.sg"`)
+
+        try {
+          const result = sg.file(level1)
+          expect(result.result).toEqual([1, 2, 3, 4, 5])
+        } finally {
+          fs.unlinkSync(level1)
+          fs.unlinkSync(level2)
+          fs.unlinkSync(level3)
+          fs.unlinkSync(level4)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('mixes @ and @@ imports in chain', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-mixed-import-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const configFile = path.join(tempDir, 'config.sg')
+        const itemsFile = path.join(tempDir, 'items.sg')
+
+        // items.sg: array to unwrap
+        fs.writeFileSync(itemsFile, 'list ["x", "y", "z"]')
+        // config.sg: uses @@ to unwrap items, regular import would give { list: [...] }
+        fs.writeFileSync(configFile, `
+name "Config"
+items @@"./items.sg"
+`)
+        // root.sg: uses regular @ to import config (not unwrap)
+        fs.writeFileSync(rootFile, `
+app
+  config @"./config.sg"
+`)
+
+        try {
+          const result = sg.file(rootFile)
+          expect(result.app.config).toEqual({
+            name: 'Config',
+            items: ['x', 'y', 'z'],
+          })
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(configFile)
+          fs.unlinkSync(itemsFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('@@ import inside array element', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-array-unwrap-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const tagsFile = path.join(tempDir, 'tags.sg')
+
+        fs.writeFileSync(tagsFile, 'items ["tag1", "tag2"]')
+        fs.writeFileSync(rootFile, `
+configs
+  name "First"
+  tags @@"./tags.sg"
+configs
+  name "Second"
+  tags ["inline"]
+`)
+
+        try {
+          const result = sg.file(rootFile)
+          expect(result.configs).toEqual([
+            { name: 'First', tags: ['tag1', 'tag2'] },
+            { name: 'Second', tags: ['inline'] },
+          ])
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(tagsFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('@@ with array of objects from nested file', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-obj-array-unwrap-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const usersFile = path.join(tempDir, 'users.sg')
+
+        // users.sg contains repeated keys which become an array
+        fs.writeFileSync(usersFile, `
+user
+  name "Alice"
+  role "admin"
+user
+  name "Bob"
+  role "user"
+`)
+        fs.writeFileSync(rootFile, `
+app "MyApp"
+users @@"./users.sg"
+`)
+
+        try {
+          const result = sg.file(rootFile)
+          expect(result.app).toBe('MyApp')
+          expect(result.users).toEqual([
+            { name: 'Alice', role: 'admin' },
+            { name: 'Bob', role: 'user' },
+          ])
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(usersFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('@@ chain with subdirectories', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-subdir-unwrap-${Date.now()}`)
+        const subDir = path.join(tempDir, 'data')
+        const deepDir = path.join(subDir, 'nested')
+        fs.mkdirSync(deepDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const middleFile = path.join(subDir, 'middle.sg')
+        const leafFile = path.join(deepDir, 'leaf.sg')
+
+        fs.writeFileSync(leafFile, 'values [100, 200, 300]')
+        fs.writeFileSync(middleFile, `nums @@"./nested/leaf.sg"`)
+        fs.writeFileSync(rootFile, `results @@"./data/middle.sg"`)
+
+        try {
+          const result = sg.file(rootFile)
+          expect(result.results).toEqual([100, 200, 300])
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(middleFile)
+          fs.unlinkSync(leafFile)
+          fs.rmdirSync(deepDir)
+          fs.rmdirSync(subDir)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('multiple @@ imports in same file', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-multi-unwrap-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const fruitsFile = path.join(tempDir, 'fruits.sg')
+        const colorsFile = path.join(tempDir, 'colors.sg')
+
+        fs.writeFileSync(fruitsFile, 'items ["apple", "banana"]')
+        fs.writeFileSync(colorsFile, 'items ["red", "blue", "green"]')
+        fs.writeFileSync(rootFile, `
+fruits @@"./fruits.sg"
+colors @@"./colors.sg"
+`)
+
+        try {
+          const result = sg.file(rootFile)
+          expect(result.fruits).toEqual(['apple', 'banana'])
+          expect(result.colors).toEqual(['red', 'blue', 'green'])
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(fruitsFile)
+          fs.unlinkSync(colorsFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('chained @@ fails when middle file has multiple keys', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-fail-multi-key-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const middleFile = path.join(tempDir, 'middle.sg')
+        const leafFile = path.join(tempDir, 'leaf.sg')
+
+        fs.writeFileSync(leafFile, 'items ["a", "b"]')
+        // middle.sg has two keys - invalid for @@
+        fs.writeFileSync(middleFile, `
+list @@"./leaf.sg"
+extra "value"
+`)
+        fs.writeFileSync(rootFile, `data @@"./middle.sg"`)
+
+        try {
+          expect(() => sg.file(rootFile)).toThrow(ParseError)
+          try {
+            sg.file(rootFile)
+          } catch (e) {
+            expect((e as ParseError).message).toContain('exactly one root key')
+          }
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(middleFile)
+          fs.unlinkSync(leafFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('chained @@ fails when leaf produces non-array', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-fail-non-array-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const middleFile = path.join(tempDir, 'middle.sg')
+        const leafFile = path.join(tempDir, 'leaf.sg')
+
+        // leaf.sg has a string, not an array
+        fs.writeFileSync(leafFile, 'value "not an array"')
+        fs.writeFileSync(middleFile, `data @@"./leaf.sg"`)
+        fs.writeFileSync(rootFile, `result @@"./middle.sg"`)
+
+        try {
+          expect(() => sg.file(rootFile)).toThrow(ParseError)
+          try {
+            sg.file(rootFile)
+          } catch (e) {
+            expect((e as ParseError).message).toContain('must be an array')
+          }
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(middleFile)
+          fs.unlinkSync(leafFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('@@ chain with inline arrays at leaf', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-inline-leaf-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const middleFile = path.join(tempDir, 'middle.sg')
+        const leafFile = path.join(tempDir, 'leaf.sg')
+
+        // Complex inline array at leaf
+        fs.writeFileSync(leafFile, 'data [1, "two", true, null]')
+        fs.writeFileSync(middleFile, `mixed @@"./leaf.sg"`)
+        fs.writeFileSync(rootFile, `values @@"./middle.sg"`)
+
+        try {
+          const result = sg.file(rootFile)
+          expect(result.values).toEqual([1, 'two', true, null])
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(middleFile)
+          fs.unlinkSync(leafFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('@@ with multiline array at leaf', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-multiline-leaf-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const leafFile = path.join(tempDir, 'leaf.sg')
+
+        fs.writeFileSync(leafFile, `items [
+  "first"
+  "second"
+  "third"
+]`)
+        fs.writeFileSync(rootFile, `data @@"./leaf.sg"`)
+
+        try {
+          const result = sg.file(rootFile)
+          expect(result.data).toEqual(['first', 'second', 'third'])
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(leafFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('async fileAsync with chained @@ imports', async () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-async-unwrap-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const middleFile = path.join(tempDir, 'middle.sg')
+        const leafFile = path.join(tempDir, 'leaf.sg')
+
+        fs.writeFileSync(leafFile, 'numbers [10, 20, 30]')
+        fs.writeFileSync(middleFile, `data @@"./leaf.sg"`)
+        fs.writeFileSync(rootFile, `values @@"./middle.sg"`)
+
+        try {
+          const result = await sg.fileAsync(rootFile)
+          expect(result.values).toEqual([10, 20, 30])
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(middleFile)
+          fs.unlinkSync(leafFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+    })
+
+    describe('import caching', () => {
+      test('multiple references to same file return consistent results', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-cache-same-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const sharedFile = path.join(tempDir, 'shared.sg')
+
+        fs.writeFileSync(sharedFile, `
+value "shared-value"
+count 42
+`)
+        fs.writeFileSync(rootFile, `
+configA @"./shared.sg"
+configB @"./shared.sg"
+configC @"./shared.sg"
+`)
+
+        try {
+          const result = sg.file(rootFile)
+          expect(result.configA).toEqual({ value: 'shared-value', count: 42 })
+          expect(result.configB).toEqual({ value: 'shared-value', count: 42 })
+          expect(result.configC).toEqual({ value: 'shared-value', count: 42 })
+          // All should be equal (same cached result)
+          expect(result.configA).toEqual(result.configB)
+          expect(result.configB).toEqual(result.configC)
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(sharedFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('cache works with mixed @ and @@ references to same file', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-cache-mixed-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const arrayFile = path.join(tempDir, 'array.sg')
+
+        fs.writeFileSync(arrayFile, 'items ["a", "b", "c"]')
+        fs.writeFileSync(rootFile, `
+full @"./array.sg"
+unwrapped @@"./array.sg"
+fullAgain @"./array.sg"
+`)
+
+        try {
+          const result = sg.file(rootFile)
+          expect(result.full).toEqual({ items: ['a', 'b', 'c'] })
+          expect(result.unwrapped).toEqual(['a', 'b', 'c'])
+          expect(result.fullAgain).toEqual({ items: ['a', 'b', 'c'] })
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(arrayFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('cache works across nested import chains', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-cache-nested-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const middleFile = path.join(tempDir, 'middle.sg')
+        const sharedFile = path.join(tempDir, 'shared.sg')
+
+        // shared.sg is referenced by both root.sg and middle.sg
+        fs.writeFileSync(sharedFile, 'data "from-shared"')
+        fs.writeFileSync(middleFile, `
+fromMiddle "middle-value"
+sharedInMiddle @"./shared.sg"
+`)
+        fs.writeFileSync(rootFile, `
+nested @"./middle.sg"
+sharedDirect @"./shared.sg"
+`)
+
+        try {
+          const result = sg.file(rootFile)
+          expect(result.nested.fromMiddle).toBe('middle-value')
+          expect(result.nested.sharedInMiddle).toEqual({ data: 'from-shared' })
+          expect(result.sharedDirect).toEqual({ data: 'from-shared' })
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(middleFile)
+          fs.unlinkSync(sharedFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('cache is isolated between separate parse calls', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-cache-isolated-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const file1 = path.join(tempDir, 'file1.sg')
+        const file2 = path.join(tempDir, 'file2.sg')
+        const sharedFile = path.join(tempDir, 'shared.sg')
+
+        fs.writeFileSync(sharedFile, 'value "original"')
+        fs.writeFileSync(file1, 'config @"./shared.sg"')
+        fs.writeFileSync(file2, 'config @"./shared.sg"')
+
+        try {
+          // First parse
+          const result1 = sg.file(file1)
+          expect(result1.config.value).toBe('original')
+
+          // Modify the shared file between parse calls
+          fs.writeFileSync(sharedFile, 'value "modified"')
+
+          // Second parse should see the modified value (new cache)
+          const result2 = sg.file(file2)
+          expect(result2.config.value).toBe('modified')
+        } finally {
+          fs.unlinkSync(file1)
+          fs.unlinkSync(file2)
+          fs.unlinkSync(sharedFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('cache handles deeply nested shared imports', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-cache-deep-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const branchA = path.join(tempDir, 'branchA.sg')
+        const branchB = path.join(tempDir, 'branchB.sg')
+        const sharedLeaf = path.join(tempDir, 'leaf.sg')
+
+        // Diamond pattern: root -> branchA -> leaf
+        //                  root -> branchB -> leaf
+        fs.writeFileSync(sharedLeaf, 'leaf "leaf-value"')
+        fs.writeFileSync(branchA, `
+branchA "a"
+leafFromA @"./leaf.sg"
+`)
+        fs.writeFileSync(branchB, `
+branchB "b"
+leafFromB @"./leaf.sg"
+`)
+        fs.writeFileSync(rootFile, `
+a @"./branchA.sg"
+b @"./branchB.sg"
+leafDirect @"./leaf.sg"
+`)
+
+        try {
+          const result = sg.file(rootFile)
+          expect(result.a.branchA).toBe('a')
+          expect(result.a.leafFromA).toEqual({ leaf: 'leaf-value' })
+          expect(result.b.branchB).toBe('b')
+          expect(result.b.leafFromB).toEqual({ leaf: 'leaf-value' })
+          expect(result.leafDirect).toEqual({ leaf: 'leaf-value' })
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(branchA)
+          fs.unlinkSync(branchB)
+          fs.unlinkSync(sharedLeaf)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('cache correctly handles same file with different unwrap modes', () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-cache-unwrap-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const dataFile = path.join(tempDir, 'data.sg')
+
+        fs.writeFileSync(dataFile, 'items [1, 2, 3]')
+        fs.writeFileSync(rootFile, `
+asObject @"./data.sg"
+asArray @@"./data.sg"
+asObjectAgain @"./data.sg"
+asArrayAgain @@"./data.sg"
+`)
+
+        try {
+          const result = sg.file(rootFile)
+          // Object references (@ syntax)
+          expect(result.asObject).toEqual({ items: [1, 2, 3] })
+          expect(result.asObjectAgain).toEqual({ items: [1, 2, 3] })
+          // Array references (@@ syntax) - unwrapped from cached result
+          expect(result.asArray).toEqual([1, 2, 3])
+          expect(result.asArrayAgain).toEqual([1, 2, 3])
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(dataFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+
+      test('async fileAsync also uses import cache', async () => {
+        const fs = require('node:fs')
+        const path = require('node:path')
+        const os = require('node:os')
+        const tempDir = path.join(os.tmpdir(), `test-cache-async-${Date.now()}`)
+        fs.mkdirSync(tempDir, { recursive: true })
+
+        const rootFile = path.join(tempDir, 'root.sg')
+        const sharedFile = path.join(tempDir, 'shared.sg')
+
+        fs.writeFileSync(sharedFile, 'shared "value"')
+        fs.writeFileSync(rootFile, `
+first @"./shared.sg"
+second @"./shared.sg"
+third @"./shared.sg"
+`)
+
+        try {
+          const result = await sg.fileAsync(rootFile)
+          expect(result.first).toEqual({ shared: 'value' })
+          expect(result.second).toEqual({ shared: 'value' })
+          expect(result.third).toEqual({ shared: 'value' })
+        } finally {
+          fs.unlinkSync(rootFile)
+          fs.unlinkSync(sharedFile)
+          fs.rmdirSync(tempDir)
+        }
+      })
+    })
   })
 })
 

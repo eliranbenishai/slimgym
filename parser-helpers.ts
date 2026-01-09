@@ -21,6 +21,8 @@ export interface ParseOptions {
   _importDepth?: number
   /** @internal */
   _sandboxDir?: string
+  /** @internal Cache for imported files to avoid re-reading/parsing the same file */
+  _importCache?: Map<string, NodeValue>
 }
 
 export interface BlockStringResult {
@@ -408,38 +410,48 @@ const parseImport = (token: string, options?: ParseOptions, lineNumber?: number,
     throw new ParseError(`Circular dependency detected: "${absolutePath}"`, lineNumber, line)
   }
 
-  try {
-    const content = fs.readFileSync(absolutePath, 'utf-8')
-    const newAncestors = new Set(options?._ancestors ?? [])
-    newAncestors.add(absolutePath)
+  // Check cache first
+  const cache = options?._importCache
+  let parsed = cache?.get(absolutePath)
 
-    const parsed = parseFunction(content, {
-      baseDir: path.dirname(absolutePath),
-      maxDepth: options?.maxDepth,
-      maxArraySize: options?.maxArraySize,
-      maxImportDepth: options?.maxImportDepth,
-      _ancestors: newAncestors,
-      _importDepth: currentImportDepth + 1,
-      _sandboxDir: options?._sandboxDir,
-    })
+  if (parsed === undefined) {
+    try {
+      const content = fs.readFileSync(absolutePath, 'utf-8')
+      const newAncestors = new Set(options?._ancestors ?? [])
+      newAncestors.add(absolutePath)
 
-    if (isUnwrap) {
-      const keys = Object.keys(parsed as object)
-      if (keys.length !== 1) {
-        throw new Error(`Imported file must have exactly one root key to use "@@" syntax, found ${keys.length} keys`)
-      }
-      const value = (parsed as Record<string, unknown>)[keys[0]]
-      if (!Array.isArray(value)) {
-        throw new Error(`Imported file's root key "${keys[0]}" must be an array to use "@@" syntax`)
-      }
-      return value
+      parsed = parseFunction(content, {
+        baseDir: path.dirname(absolutePath),
+        maxDepth: options?.maxDepth,
+        maxArraySize: options?.maxArraySize,
+        maxImportDepth: options?.maxImportDepth,
+        _ancestors: newAncestors,
+        _importDepth: currentImportDepth + 1,
+        _sandboxDir: options?._sandboxDir,
+        _importCache: cache,
+      }) as NodeValue
+
+      // Store in cache for reuse
+      cache?.set(absolutePath, parsed)
+    } catch (error) {
+      if (error instanceof ParseError) throw error
+      throw new ParseError(`Failed to import file "${importPath}": ${(error as Error).message}`, lineNumber, line)
     }
-
-    return parsed as NodeValue
-  } catch (error) {
-    if (error instanceof ParseError) throw error
-    throw new ParseError(`Failed to import file "${importPath}": ${(error as Error).message}`, lineNumber, line)
   }
+
+  if (isUnwrap) {
+    const keys = Object.keys(parsed as object)
+    if (keys.length !== 1) {
+      throw new ParseError(`Imported file must have exactly one root key to use "@@" syntax, found ${keys.length} keys`, lineNumber, line)
+    }
+    const value = (parsed as Record<string, unknown>)[keys[0]]
+    if (!Array.isArray(value)) {
+      throw new ParseError(`Imported file's root key "${keys[0]}" must be an array to use "@@" syntax`, lineNumber, line)
+    }
+    return value
+  }
+
+  return parsed
 }
 
 
