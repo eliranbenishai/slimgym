@@ -258,7 +258,9 @@ Built-in protections for untrusted input:
 
 ## Use Cases
 
-**AI prompt templates** - Store system prompts, few-shot examples, and long multi-line instructions with block strings (no escaping).
+**i18n / localization** - Structured translations with block strings for long copy and/or markdown.
+
+**CMS content** - Static pages with metadata + content in one human-editable file.
 
 **Multi-environment config** - Compose a base config and override per environment using `@` imports.
 
@@ -266,9 +268,7 @@ Built-in protections for untrusted input:
 
 **Game content** - Dialogue, quests, item databases—friendly for writers/designers to edit safely.
 
-**i18n / localization** - Structured translations with block strings for long copy.
-
-**CMS content** - Static pages with metadata + content in one human-editable file.
+**AI prompt templates** - Store system prompts, few-shot examples, and long multi-line instructions with block strings (no escaping).
 
 ## Development
 
