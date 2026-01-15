@@ -27,7 +27,9 @@ export class ParseError extends Error {
       ? ` at line ${lineNumber + 1}${hasColumn ? `, column ${columnNumber + 1}` : ''}`
       : ''
     const codeFrame = hasLine ? buildCodeFrame(line, lineNumber, columnNumber) : undefined
-    const fullMessage = codeFrame ? `${message}${location}\n${codeFrame}` : `${message}${location}`
+    const fullMessage = codeFrame !== undefined
+      ? `${message}${location}\n${codeFrame}`
+      : `${message}${location}`
 
     super(fullMessage)
     this.name = 'ParseError'
