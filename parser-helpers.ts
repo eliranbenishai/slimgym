@@ -37,7 +37,7 @@ export interface MultiLineArrayResult {
   lineIndex: number
 }
 
-export type ValueParser = (token: string, lineNumber?: number, line?: string) => NodeValue
+export type ValueParser = (token: string, lineNumber?: number, line?: string, columnNumber?: number) => NodeValue
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Array Parsing
@@ -64,7 +64,14 @@ export const parseArrayValue = (
   if (closingIdx !== -1) {
     const arrayContent = input.slice(i + 1, closingIdx)
     if (arrayContent.trim().length === 0) return []
-    return parseArrayItems(arrayContent, parseValueWithOptions, maxArraySize, lineIndex, input.slice(lineStart, lineEnd))
+    return parseArrayItems(
+      arrayContent,
+      parseValueWithOptions,
+      maxArraySize,
+      lineIndex,
+      input.slice(lineStart, lineEnd),
+      (i + 1) - lineStart
+    )
   }
 
   // Return empty array as placeholder - actual parsing happens in main loop
@@ -87,6 +94,7 @@ export const parseMultiLineArray = (
   while (pos < len) {
     let lineEnd = input.indexOf('\n', pos)
     if (lineEnd === -1) lineEnd = len
+    const line = input.slice(pos, lineEnd)
 
     let indent = 0
     let k = pos
@@ -105,7 +113,12 @@ export const parseMultiLineArray = (
     // Check closing bracket
     if (input.charCodeAt(k) === 93 && indent <= arrayIndent) {
       if (maxArraySize > 0 && maxArraySize !== Infinity && items.length > maxArraySize) {
-        throw new ParseError(`Array exceeds maximum size of ${maxArraySize}`)
+        throw new ParseError(
+          `Array exceeds maximum size of ${maxArraySize}`,
+          lineIndex,
+          line,
+          indent
+        )
       }
       return {
         value: items.map(item => parseValueWithOptions(item)),
@@ -115,7 +128,7 @@ export const parseMultiLineArray = (
     }
 
     if (indent <= arrayIndent) {
-      throw new ParseError('Unclosed array: missing closing bracket "]"')
+      throw new ParseError('Unclosed array: missing closing bracket "]"', lineIndex, line, indent)
     }
 
     const itemContent = input.slice(k, lineEnd).trim()
@@ -146,7 +159,8 @@ export const parseArrayItems = (
   valueParser: ValueParser,
   maxArraySize: number,
   lineNumber?: number,
-  line?: string
+  line?: string,
+  columnOffset?: number
 ): NodeValue[] => {
   const root: NodeValue[] = []
   const stack: NodeValue[][] = [root]
@@ -168,9 +182,12 @@ export const parseArrayItems = (
 
     if (!inString) {
       if (char === 91) { // [
-        const pre = token.slice(start, i).trim()
+        const preRaw = token.slice(start, i)
+        const pre = preRaw.trim()
         if (pre.length > 0) {
-          stack[stack.length - 1].push(valueParser(pre, lineNumber, line))
+          const leadingSpaces = preRaw.length - preRaw.trimStart().length
+          const columnNumber = columnOffset !== undefined ? columnOffset + start + leadingSpaces : undefined
+          stack[stack.length - 1].push(valueParser(pre, lineNumber, line, columnNumber))
           checkSize(stack[stack.length - 1])
         }
         const newArr: NodeValue[] = []
@@ -179,20 +196,27 @@ export const parseArrayItems = (
         stack.push(newArr)
         start = i + 1
       } else if (char === 93) { // ]
-        const val = token.slice(start, i).trim()
+        const valRaw = token.slice(start, i)
+        const val = valRaw.trim()
         if (val.length > 0) {
-          stack[stack.length - 1].push(valueParser(val, lineNumber, line))
+          const leadingSpaces = valRaw.length - valRaw.trimStart().length
+          const columnNumber = columnOffset !== undefined ? columnOffset + start + leadingSpaces : undefined
+          stack[stack.length - 1].push(valueParser(val, lineNumber, line, columnNumber))
           checkSize(stack[stack.length - 1])
         }
         if (stack.length === 1) {
-          throw new ParseError('Unexpected closing bracket "]" in array', lineNumber, line)
+          const columnNumber = columnOffset !== undefined ? columnOffset + i : undefined
+          throw new ParseError('Unexpected closing bracket "]" in array', lineNumber, line, columnNumber)
         }
         stack.pop()
         start = i + 1
       } else if (char === 44) { // ,
-        const val = token.slice(start, i).trim()
+        const valRaw = token.slice(start, i)
+        const val = valRaw.trim()
         if (val.length > 0) {
-          stack[stack.length - 1].push(valueParser(val, lineNumber, line))
+          const leadingSpaces = valRaw.length - valRaw.trimStart().length
+          const columnNumber = columnOffset !== undefined ? columnOffset + start + leadingSpaces : undefined
+          stack[stack.length - 1].push(valueParser(val, lineNumber, line, columnNumber))
           checkSize(stack[stack.length - 1])
         }
         start = i + 1
@@ -208,17 +232,22 @@ export const parseArrayItems = (
   }
 
   if (inString) {
-    throw new ParseError('Unclosed string in array', lineNumber, line)
+    const columnNumber = columnOffset !== undefined ? columnOffset + i : undefined
+    throw new ParseError('Unclosed string in array', lineNumber, line, columnNumber)
   }
 
-  const val = token.slice(start).trim()
+  const valRaw = token.slice(start)
+  const val = valRaw.trim()
   if (val.length > 0) {
-    stack[stack.length - 1].push(valueParser(val, lineNumber, line))
+    const leadingSpaces = valRaw.length - valRaw.trimStart().length
+    const columnNumber = columnOffset !== undefined ? columnOffset + start + leadingSpaces : undefined
+    stack[stack.length - 1].push(valueParser(val, lineNumber, line, columnNumber))
     checkSize(stack[stack.length - 1])
   }
 
   if (stack.length > 1) {
-    throw new ParseError('Unclosed array: missing closing bracket "]"', lineNumber, line)
+    const columnNumber = columnOffset !== undefined ? columnOffset + len : undefined
+    throw new ParseError('Unclosed array: missing closing bracket "]"', lineNumber, line, columnNumber)
   }
 
   return root
@@ -326,7 +355,7 @@ export const setParseFunction = (fn: <T>(input: string, options?: ParseOptions) 
   parseFunction = fn
 }
 
-export const parseValue = (token: string, options?: ParseOptions, lineNumber?: number, line?: string): NodeValue => {
+export const parseValue = (token: string, options?: ParseOptions, lineNumber?: number, line?: string, columnNumber?: number): NodeValue => {
   // Literals
   if (token === 'null') return null
   if (token === 'undefined') return undefined
@@ -335,7 +364,7 @@ export const parseValue = (token: string, options?: ParseOptions, lineNumber?: n
 
   // Import
   if (token.startsWith('@')) {
-    return parseImport(token, options, lineNumber, line)
+    return parseImport(token, options, lineNumber, line, columnNumber)
   }
 
   const firstChar = token.charCodeAt(0)
@@ -373,16 +402,16 @@ export const parseValue = (token: string, options?: ParseOptions, lineNumber?: n
   return token
 }
 
-const parseImport = (token: string, options?: ParseOptions, lineNumber?: number, line?: string): NodeValue => {
+const parseImport = (token: string, options?: ParseOptions, lineNumber?: number, line?: string, columnNumber?: number): NodeValue => {
   if (parseFunction === null) {
-    throw new ParseError('Parser not initialized', lineNumber, line)
+    throw new ParseError('Parser not initialized', lineNumber, line, columnNumber)
   }
 
   const maxImportDepth = options?.maxImportDepth ?? DEFAULT_MAX_IMPORT_DEPTH
   const currentImportDepth = options?._importDepth ?? 0
 
   if (maxImportDepth > 0 && maxImportDepth !== Infinity && currentImportDepth >= maxImportDepth) {
-    throw new ParseError(`Maximum import depth of ${maxImportDepth} exceeded`, lineNumber, line)
+    throw new ParseError(`Maximum import depth of ${maxImportDepth} exceeded`, lineNumber, line, columnNumber)
   }
 
   let isUnwrap = false
@@ -407,7 +436,7 @@ const parseImport = (token: string, options?: ParseOptions, lineNumber?: number,
   }
 
   if (options?._ancestors?.has(absolutePath) === true) {
-    throw new ParseError(`Circular dependency detected: "${absolutePath}"`, lineNumber, line)
+    throw new ParseError(`Circular dependency detected: "${absolutePath}"`, lineNumber, line, columnNumber)
   }
 
   // Check cache first
@@ -435,18 +464,18 @@ const parseImport = (token: string, options?: ParseOptions, lineNumber?: number,
       cache?.set(absolutePath, parsed)
     } catch (error) {
       if (error instanceof ParseError) throw error
-      throw new ParseError(`Failed to import file "${importPath}": ${(error as Error).message}`, lineNumber, line)
+      throw new ParseError(`Failed to import file "${importPath}": ${(error as Error).message}`, lineNumber, line, columnNumber)
     }
   }
 
   if (isUnwrap) {
     const keys = Object.keys(parsed as object)
     if (keys.length !== 1) {
-      throw new ParseError(`Imported file must have exactly one root key to use "@@" syntax, found ${keys.length} keys`, lineNumber, line)
+      throw new ParseError(`Imported file must have exactly one root key to use "@@" syntax, found ${keys.length} keys`, lineNumber, line, columnNumber)
     }
     const value = (parsed as Record<string, unknown>)[keys[0]]
     if (!Array.isArray(value)) {
-      throw new ParseError(`Imported file's root key "${keys[0]}" must be an array to use "@@" syntax`, lineNumber, line)
+      throw new ParseError(`Imported file's root key "${keys[0]}" must be an array to use "@@" syntax`, lineNumber, line, columnNumber)
     }
     return value
   }

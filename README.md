@@ -245,7 +245,27 @@ import { slimgify } from 'slimgym/slimgify'
 
 ## Error Handling
 
-Catch `ParseError` for file/parse errors. Includes `message` and `lineNumber` (when applicable).
+Catch `ParseError` for file/parse errors. Includes `message`, `lineNumber`, `columnNumber`, and a `codeFrame` when applicable.
+
+```typescript
+import sg, { ParseError } from 'slimgym'
+
+try {
+  sg.parse(`user\n  name "Jane"\n  []__proto__ 1`)
+} catch (error) {
+  if (error instanceof ParseError) {
+    console.error(error.message)
+  }
+}
+```
+
+Output:
+
+```text
+Forbidden key "__proto__" (potential prototype pollution) at line 3, column 5
+3 |   []__proto__ 1
+  |     ^
+```
 
 ## Security
 

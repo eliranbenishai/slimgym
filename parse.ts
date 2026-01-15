@@ -96,8 +96,8 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
   const root: NodeObject = {}
   const stack: { indent: number; obj: NodeObject }[] = [{ indent: -1, obj: root }]
 
-  const parseValueWithOptions = (token: string, lineNumber?: number, line?: string): NodeValue => {
-    return parseValue(token, effectiveOptions, lineNumber, line)
+  const parseValueWithOptions = (token: string, lineNumber?: number, line?: string, columnNumber?: number): NodeValue => {
+    return parseValue(token, effectiveOptions, lineNumber, line, columnNumber)
   }
 
   while (pos < len) {
@@ -141,12 +141,14 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
 
     for (let k = 0; k < key.length; k++) {
       if (!isValidKeyCharCode(key.charCodeAt(k))) {
-        throw new ParseError(`Invalid key format: "${rawKey}"`, lineIndex, line)
+        const columnNumber = (keyStart - lineStart) + k + (forceArray ? 2 : 0)
+        throw new ParseError(`Invalid key format: "${rawKey}"`, lineIndex, line, columnNumber)
       }
     }
 
     if (DANGEROUS_KEYS.has(key)) {
-      throw new ParseError(`Forbidden key "${key}" (potential prototype pollution)`, lineIndex, line)
+      const columnNumber = (keyStart - lineStart) + (forceArray ? 2 : 0)
+      throw new ParseError(`Forbidden key "${key}" (potential prototype pollution)`, lineIndex, line, columnNumber)
     }
 
     while (i < lineEnd && input.charCodeAt(i) === 32) i++
@@ -190,7 +192,7 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
             lineIndex = result.lineIndex
           } else {
             // Simple value (strip inline comments and trailing spaces)
-            value = parseValueWithOptions(input.slice(i, valueEnd), lineIndex, line)
+            value = parseValueWithOptions(input.slice(i, valueEnd), lineIndex, line, i - lineStart)
             pos = lineEnd + 1
             lineIndex++
           }
@@ -222,7 +224,8 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
 
     if (typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date)) {
       if (maxDepth > 0 && maxDepth !== Infinity && stack.length >= maxDepth) {
-        throw new ParseError(`Maximum nesting depth of ${maxDepth} exceeded`, lineIndex, line)
+        const columnNumber = keyStart - lineStart
+        throw new ParseError(`Maximum nesting depth of ${maxDepth} exceeded`, lineIndex, line, columnNumber)
       }
       stack.push({ indent, obj: value })
     }
