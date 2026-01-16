@@ -235,12 +235,12 @@ export const parse = <T = any>(input: string, options?: ParseOptions): T => {
   return wrapParsedConfig<T>(root as T)
 }
 
-type ArrayState = {
+interface ArrayState {
   array: NodeValue[]
   arrayIndent: number
 }
 
-type BlockState = {
+interface BlockState {
   lines: string[]
   baseIndent: number
   blockIndent: number | null
@@ -249,7 +249,7 @@ type BlockState = {
   forceArray: boolean
 }
 
-type ArrayBlockState = {
+interface ArrayBlockState {
   lines: string[]
   baseIndent: number
   blockIndent: number | null
@@ -300,7 +300,7 @@ export const parseStream = async <T = any>(
   input: AsyncIterable<string | Uint8Array>,
   options?: ParseOptions
 ): Promise<T> => {
-  if (input == null || typeof (input as AsyncIterable<unknown>)[Symbol.asyncIterator] !== 'function') {
+  if (typeof (input as AsyncIterable<unknown>)[Symbol.asyncIterator] !== 'function') {
     throw new ParseError('Input must be an async iterable')
   }
 
