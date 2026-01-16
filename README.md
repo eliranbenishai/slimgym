@@ -142,6 +142,18 @@ const config = sg.parse<MyConfig>(`name "App"`)
 
 **Options:** `baseDir`, `maxDepth` (default: 100), `maxArraySize` (default: 10000), `maxImportDepth` (default: 10). Set limits to `0` or `Infinity` to disable.
 
+### `parseStream<T>(input: AsyncIterable<string | Uint8Array>, options?): Promise<T>`
+
+Parse a stream of chunks/lines into a JavaScript object (useful for very large files).
+
+```typescript
+import { createReadStream } from 'node:fs'
+import { parseStream } from 'slimgym/parse'
+
+const stream = createReadStream('./config.sg')
+const config = await parseStream(stream)
+```
+
 ### `file<T>(filePath, options?)` / `fileAsync<T>(filePath, options?)`
 
 Read and parse a SlimGym file (sync or async).
