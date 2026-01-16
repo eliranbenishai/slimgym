@@ -402,7 +402,15 @@ export const parseValue = (token: string, options?: ParseOptions, lineNumber?: n
   return token
 }
 
+const isBrowserEnvironment = (): boolean => {
+  if (typeof globalThis !== 'object') return false
+  return 'document' in globalThis
+}
+
 const parseImport = (token: string, options?: ParseOptions, lineNumber?: number, line?: string, columnNumber?: number): NodeValue => {
+  if (isBrowserEnvironment()) {
+    throw new ParseError('File imports (@) are not available in browser environments', lineNumber, line, columnNumber)
+  }
   if (parseFunction === null) {
     throw new ParseError('Parser not initialized', lineNumber, line, columnNumber)
   }

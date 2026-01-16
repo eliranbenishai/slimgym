@@ -267,6 +267,8 @@ Forbidden key "__proto__" (potential prototype pollution) at line 3, column 5
   |     ^
 ```
 
+> Note: `file()` / `fileAsync()` and `@` imports are server-only and throw `ParseError` in browser environments.
+
 ## Security
 
 Built-in protections for untrusted input:

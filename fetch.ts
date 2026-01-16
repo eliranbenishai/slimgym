@@ -41,6 +41,11 @@ export interface FetchUrlOptions {
   method?: 'GET' | 'HEAD' | 'OPTIONS'
 }
 
+const isBrowserEnvironment = (): boolean => {
+  if (typeof globalThis !== 'object') return false
+  return 'document' in globalThis
+}
+
 // Forward declaration for parse function (set from parse.ts)
 let parseFunction: (<T>(input: string, options?: ParseOptions) => T) | null = null
 
@@ -83,6 +88,9 @@ const createParseOptions = (absolutePath: string, options?: FetchOptions): Parse
 })
 
 export const file = <T = any>(filePath: string, options?: FetchOptions): T => {
+  if (isBrowserEnvironment()) {
+    throw new ParseError('file() is not available in browser environments')
+  }
   if (parseFunction === null) {
     throw new ParseError('Parser not initialized')
   }
@@ -98,6 +106,9 @@ export const file = <T = any>(filePath: string, options?: FetchOptions): T => {
 }
 
 export const fileAsync = async <T = any>(filePath: string, options?: FetchOptions): Promise<T> => {
+  if (isBrowserEnvironment()) {
+    throw new ParseError('fileAsync() is not available in browser environments')
+  }
   if (parseFunction === null) {
     throw new ParseError('Parser not initialized')
   }
