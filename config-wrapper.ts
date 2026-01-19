@@ -233,6 +233,51 @@ const deepClone = <T>(value: T): T => {
 }
 
 /**
+ * Check if a value is a plain object (not array, Date, or null).
+ */
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)
+}
+
+/**
+ * Deep merge two values. Override values take precedence.
+ * - Plain objects are recursively merged at all depths
+ * - Arrays, primitives, Dates, null/undefined replace entirely
+ */
+const deepMerge = <T>(base: T, override: unknown): T => {
+  // If override is null/undefined, keep base
+  if (override === null || override === undefined) return base
+
+  // If override is not a plain object, it replaces entirely
+  if (!isPlainObject(override)) {
+    return deepClone(override) as T
+  }
+
+  // If base is not a plain object, override replaces entirely
+  if (!isPlainObject(base)) {
+    return deepClone(override) as T
+  }
+
+  // Both are plain objects - merge recursively
+  const result = { ...base } as Record<string, unknown>
+
+  for (const key of Object.keys(override)) {
+    const baseVal = result[key]
+    const overrideVal = override[key]
+
+    if (isPlainObject(baseVal) && isPlainObject(overrideVal)) {
+      // Both are plain objects - recursively merge
+      result[key] = deepMerge(baseVal, overrideVal)
+    } else {
+      // Override replaces (clone to avoid shared references)
+      result[key] = deepClone(overrideVal)
+    }
+  }
+
+  return result as T
+}
+
+/**
  * Recursively freeze an object to make it fully readonly.
  */
 const deepFreeze = <T>(obj: T): T => {
@@ -273,6 +318,7 @@ interface ConfigMethods<T> {
   $findAllValues: (pattern: string, options?: FindOptions) => FindResult[]
   $forEach: (callback: ForEachCallback<T>) => void
   $clone: (query?: string, options?: FindOptions) => unknown
+  $merge: (override: Partial<T> | Record<string, unknown>) => T
   $freeze: () => T
 }
 
@@ -365,6 +411,11 @@ const createMethods = <T>(data: T): ConfigMethods<T> => ({
     return result
   },
 
+  $merge: (override: Partial<T> | Record<string, unknown>): T => {
+    const merged = deepMerge(data, override)
+    return wrapParsedConfig(merged)
+  },
+
   $freeze: (): T => {
     deepFreeze(data)
     return data
@@ -372,7 +423,7 @@ const createMethods = <T>(data: T): ConfigMethods<T> => ({
 })
 
 // Method names for the proxy handler
-const METHOD_NAMES = ['$find', '$findAll', '$findValue', '$findAllValues', '$forEach', '$clone', '$freeze'] as const
+const METHOD_NAMES = ['$find', '$findAll', '$findValue', '$findAllValues', '$forEach', '$clone', '$merge', '$freeze'] as const
 
 /**
  * Wraps parsed data in a Proxy that exposes utility methods.

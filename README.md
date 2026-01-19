@@ -234,6 +234,27 @@ const copy = config.$clone()              // Full deep copy
 const tags = config.$clone('user.tags')   // Clone only matching portion
 ```
 
+### `$merge(override)`
+
+Deep merge another object into this one. Override values take precedence at any depth. Returns a new wrapped config (chainable).
+
+```typescript
+const base = sg.file('./base.sg')
+const overrides = sg.file('./overrides.sg')
+const config = base.$merge(overrides)
+
+// Chain multiple overrides
+const config = base
+  .$merge(sg.file('./env/production.sg'))
+  .$merge({ database: { port: 5433 } })
+```
+
+**Merge behavior:**
+- Plain objects are recursively merged at all depths
+- Arrays, primitives, Dates, and null replace entirely (not merged)
+- Keys only in base are preserved
+- Keys only in override are added
+
 ### `$freeze()`
 
 Recursively freeze the object (immutable). Returns self for chaining.

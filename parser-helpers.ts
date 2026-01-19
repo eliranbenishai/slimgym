@@ -90,11 +90,13 @@ export const parseMultiLineArray = (
   const items: string[] = []
   let pos = startPos
   let lineIndex = startLineIndex
+  let lastLine = ''
 
   while (pos < len) {
     let lineEnd = input.indexOf('\n', pos)
     if (lineEnd === -1) lineEnd = len
     const line = input.slice(pos, lineEnd)
+    lastLine = line
 
     let indent = 0
     let k = pos
@@ -151,7 +153,7 @@ export const parseMultiLineArray = (
     lineIndex++
   }
 
-  throw new ParseError('Unclosed array: missing closing bracket "]"')
+  throw new ParseError('Unclosed array: missing closing bracket "]"', lineIndex - 1, lastLine)
 }
 
 export const parseArrayItems = (
@@ -490,13 +492,4 @@ const parseImport = (token: string, options?: ParseOptions, lineNumber?: number,
 
   return parsed
 }
-
-
-
-
-
-
-
-
-
 

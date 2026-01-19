@@ -1884,6 +1884,234 @@ user
       expect(Object.isFrozen(result)).toBe(true)
     })
   })
+
+  describe('$merge', () => {
+    test('merges simple objects at root level', () => {
+      const base = sg.parse(`
+name "John"
+age 30
+`)
+      const merged = base.$merge({ age: 31, city: 'NYC' })
+      expect(merged).toEqual({ name: 'John', age: 31, city: 'NYC' })
+    })
+
+    test('deep merges nested objects', () => {
+      const base = sg.parse(`
+user
+  name "John"
+  age 30
+  address
+    city "Boston"
+    zip 02101
+`)
+      const merged = base.$merge({
+        user: {
+          age: 31,
+          address: {
+            city: 'NYC',
+          },
+        },
+      })
+      expect(merged.user.name).toBe('John') // preserved
+      expect(merged.user.age).toBe(31) // overridden
+      expect(merged.user.address.city).toBe('NYC') // deep override
+      expect(merged.user.address.zip).toBe(2101) // preserved at depth
+    })
+
+    test('replaces arrays entirely (does not merge)', () => {
+      const base = sg.parse(`
+tags ["a", "b", "c"]
+`)
+      const merged = base.$merge({ tags: ['x', 'y'] })
+      expect(merged.tags).toEqual(['x', 'y'])
+    })
+
+    test('replaces primitives with objects', () => {
+      const base = sg.parse(`
+config "simple"
+`)
+      const merged = base.$merge({ config: { advanced: true } })
+      expect(merged.config).toEqual({ advanced: true })
+    })
+
+    test('replaces objects with primitives', () => {
+      const base = sg.parse(`
+config
+  advanced true
+`)
+      const merged = base.$merge({ config: 'simple' })
+      expect(merged.config).toBe('simple')
+    })
+
+    test('preserves base keys not in override', () => {
+      const base = sg.parse(`
+a 1
+b 2
+c 3
+`)
+      const merged = base.$merge({ b: 20 })
+      expect(merged).toEqual({ a: 1, b: 20, c: 3 })
+    })
+
+    test('adds new keys from override', () => {
+      const base = sg.parse(`
+existing "value"
+`)
+      const merged = base.$merge({ newKey: 'new value' })
+      expect(merged).toEqual({ existing: 'value', newKey: 'new value' })
+    })
+
+    test('handles deeply nested override paths', () => {
+      const base = sg.parse(`
+level1
+  level2
+    level3
+      level4
+        value "original"
+        other "kept"
+`)
+      const merged = base.$merge({
+        level1: {
+          level2: {
+            level3: {
+              level4: {
+                value: 'overridden',
+              },
+            },
+          },
+        },
+      })
+      expect(merged.level1.level2.level3.level4.value).toBe('overridden')
+      expect(merged.level1.level2.level3.level4.other).toBe('kept')
+    })
+
+    test('handles null values in override', () => {
+      const base = sg.parse(`
+value "something"
+`)
+      const merged = base.$merge({ value: null })
+      expect(merged.value).toBe(null)
+    })
+
+    test('handles Date values in override', () => {
+      const base = sg.parse(`
+date 2025-01-01
+`)
+      const newDate = new Date('2026-06-15')
+      const merged = base.$merge({ date: newDate })
+      expect(merged.date).toBeInstanceOf(Date)
+      expect(merged.date.getTime()).toBe(newDate.getTime())
+    })
+
+    test('returns a new object (does not mutate base)', () => {
+      const base = sg.parse(`
+user
+  name "John"
+`)
+      const merged = base.$merge({ user: { name: 'Jane' } })
+      expect(base.user.name).toBe('John') // unchanged
+      expect(merged.user.name).toBe('Jane')
+    })
+
+    test('merged result has $ methods (is wrapped)', () => {
+      const base = sg.parse(`name "John"`)
+      const merged = base.$merge({ age: 30 })
+      expect('$find' in merged).toBe(true)
+      expect('$merge' in merged).toBe(true)
+      expect('$clone' in merged).toBe(true)
+    })
+
+    test('can chain multiple merges', () => {
+      const base = sg.parse(`
+env "development"
+port 3000
+`)
+      const result = base
+        .$merge({ port: 8080 })
+        .$merge({ debug: true })
+        .$merge({ env: 'production' })
+
+      expect(result).toEqual({
+        env: 'production',
+        port: 8080,
+        debug: true,
+      })
+    })
+
+    test('works with file imports for inheritance', () => {
+      const fs = require('node:fs')
+      const path = require('node:path')
+      const os = require('node:os')
+      const tempDir = path.join(os.tmpdir(), `test-merge-${Date.now()}`)
+      fs.mkdirSync(tempDir, { recursive: true })
+
+      const baseFile = path.join(tempDir, 'base.sg')
+      const overrideFile = path.join(tempDir, 'override.sg')
+
+      fs.writeFileSync(baseFile, `
+database
+  host "localhost"
+  port 5432
+  credentials
+    username "admin"
+    password "secret"
+logging
+  level "info"
+`)
+      fs.writeFileSync(overrideFile, `
+database
+  port 5433
+  credentials
+    password "production-secret"
+logging
+  level "debug"
+`)
+
+      try {
+        const base = sg.file(baseFile)
+        const override = sg.file(overrideFile)
+        const config = base.$merge(override)
+
+        expect(config.database.host).toBe('localhost') // preserved
+        expect(config.database.port).toBe(5433) // overridden
+        expect(config.database.credentials.username).toBe('admin') // preserved
+        expect(config.database.credentials.password).toBe('production-secret') // overridden
+        expect(config.logging.level).toBe('debug') // overridden
+      } finally {
+        fs.unlinkSync(baseFile)
+        fs.unlinkSync(overrideFile)
+        fs.rmdirSync(tempDir)
+      }
+    })
+
+    test('$merge method is non-enumerable', () => {
+      const result = sg.parse(`name "John"`)
+      expect(Object.keys(result)).toEqual(['name'])
+      expect('$merge' in result).toBe(true)
+    })
+
+    test('handles empty override object', () => {
+      const base = sg.parse(`name "John"`)
+      const merged = base.$merge({})
+      expect(merged).toEqual({ name: 'John' })
+    })
+
+    test('handles arrays of objects (replaces, does not merge)', () => {
+      const base = sg.parse(`
+users
+  user
+    name "Alice"
+  user
+    name "Bob"
+`)
+      const merged = base.$merge({
+        users: {
+          user: [{ name: 'Charlie' }],
+        },
+      })
+      expect(merged.users.user).toEqual([{ name: 'Charlie' }])
+    })
+  })
 })
 
 describe('slimgify', () => {
