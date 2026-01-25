@@ -255,6 +255,19 @@ const config = base
 - Keys only in base are preserved
 - Keys only in override are added
 
+### `$mergeJSON(json)`
+
+Same as `$merge`, but accepts a JSON string instead of an object. Throws `ParseError` for invalid JSON or non-object JSON values.
+
+```typescript
+const config = base.$mergeJSON('{"database": {"port": 5433}}')
+
+// Chain with $merge
+const config = base
+  .$merge(sg.file('./env/production.sg'))
+  .$mergeJSON(process.env.CONFIG_OVERRIDES ?? '{}')
+```
+
 ### `$freeze()`
 
 Recursively freeze the object (immutable). Returns self for chaining.

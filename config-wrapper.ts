@@ -3,6 +3,8 @@
  * Methods use $ prefix to avoid conflicts with user data keys.
  */
 
+import { ParseError } from './types.js'
+
 export interface FindOptions {
   /**
    * Maximum depth to search. Defaults to Infinity.
@@ -319,6 +321,7 @@ interface ConfigMethods<T> {
   $forEach: (callback: ForEachCallback<T>) => void
   $clone: (query?: string, options?: FindOptions) => unknown
   $merge: (override: Partial<T> | Record<string, unknown>) => T
+  $mergeJSON: (json: string) => T
   $freeze: () => T
 }
 
@@ -416,6 +419,21 @@ const createMethods = <T>(data: T): ConfigMethods<T> => ({
     return wrapParsedConfig(merged)
   },
 
+  $mergeJSON: (json: string): T => {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(json)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      throw new ParseError(`Invalid JSON: ${message}`)
+    }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new ParseError('$mergeJSON expects a JSON object, not an array or primitive')
+    }
+    const merged = deepMerge(data, parsed)
+    return wrapParsedConfig(merged)
+  },
+
   $freeze: (): T => {
     deepFreeze(data)
     return data
@@ -423,7 +441,7 @@ const createMethods = <T>(data: T): ConfigMethods<T> => ({
 })
 
 // Method names for the proxy handler
-const METHOD_NAMES = ['$find', '$findAll', '$findValue', '$findAllValues', '$forEach', '$clone', '$merge', '$freeze'] as const
+const METHOD_NAMES = ['$find', '$findAll', '$findValue', '$findAllValues', '$forEach', '$clone', '$merge', '$mergeJSON', '$freeze'] as const
 
 /**
  * Wraps parsed data in a Proxy that exposes utility methods.

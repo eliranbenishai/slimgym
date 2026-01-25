@@ -2112,6 +2112,94 @@ users
       expect(merged.users.user).toEqual([{ name: 'Charlie' }])
     })
   })
+
+  describe('$mergeJSON', () => {
+    test('merges JSON string into config', () => {
+      const base = sg.parse(`
+name "John"
+age 30
+`)
+      const merged = base.$mergeJSON('{"age": 31, "city": "NYC"}')
+      expect(merged).toEqual({ name: 'John', age: 31, city: 'NYC' })
+    })
+
+    test('deep merges nested JSON', () => {
+      const base = sg.parse(`
+user
+  name "John"
+  address
+    city "Boston"
+    zip 02101
+`)
+      const merged = base.$mergeJSON(JSON.stringify({
+        user: {
+          address: {
+            city: 'NYC',
+          },
+        },
+      }))
+      expect(merged.user.name).toBe('John') // preserved
+      expect(merged.user.address.city).toBe('NYC') // overridden
+      expect(merged.user.address.zip).toBe(2101) // preserved
+    })
+
+    test('throws ParseError for invalid JSON', () => {
+      const base = sg.parse(`name "John"`)
+      expect(() => base.$mergeJSON('{invalid json}')).toThrow(ParseError)
+      expect(() => base.$mergeJSON('{invalid json}')).toThrow(/Invalid JSON/)
+    })
+
+    test('throws ParseError for JSON array', () => {
+      const base = sg.parse(`name "John"`)
+      expect(() => base.$mergeJSON('[1, 2, 3]')).toThrow(ParseError)
+      expect(() => base.$mergeJSON('[1, 2, 3]')).toThrow(/expects a JSON object/)
+    })
+
+    test('throws ParseError for JSON primitive', () => {
+      const base = sg.parse(`name "John"`)
+      expect(() => base.$mergeJSON('"string"')).toThrow(ParseError)
+      expect(() => base.$mergeJSON('42')).toThrow(ParseError)
+      expect(() => base.$mergeJSON('true')).toThrow(ParseError)
+      expect(() => base.$mergeJSON('null')).toThrow(ParseError)
+    })
+
+    test('returns wrapped config (chainable)', () => {
+      const base = sg.parse(`name "John"`)
+      const merged = base.$mergeJSON('{"age": 30}')
+      expect('$find' in merged).toBe(true)
+      expect('$merge' in merged).toBe(true)
+      expect('$mergeJSON' in merged).toBe(true)
+    })
+
+    test('can chain $merge and $mergeJSON', () => {
+      const base = sg.parse(`
+env "development"
+port 3000
+`)
+      const result = base
+        .$mergeJSON('{"port": 8080}')
+        .$merge({ debug: true })
+        .$mergeJSON('{"env": "production"}')
+
+      expect(result).toEqual({
+        env: 'production',
+        port: 8080,
+        debug: true,
+      })
+    })
+
+    test('$mergeJSON method is non-enumerable', () => {
+      const result = sg.parse(`name "John"`)
+      expect(Object.keys(result)).toEqual(['name'])
+      expect('$mergeJSON' in result).toBe(true)
+    })
+
+    test('handles empty JSON object', () => {
+      const base = sg.parse(`name "John"`)
+      const merged = base.$mergeJSON('{}')
+      expect(merged).toEqual({ name: 'John' })
+    })
+  })
 })
 
 describe('slimgify', () => {
