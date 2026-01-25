@@ -260,12 +260,14 @@ const config = base
 Same as `$merge`, but accepts a JSON string instead of an object. Throws `ParseError` for invalid JSON or non-object JSON values.
 
 ```typescript
-const config = base.$mergeJSON('{"database": {"port": 5433}}')
+import { readFileSync } from 'node:fs'
 
-// Chain with $merge
-const config = base
-  .$merge(sg.file('./env/production.sg'))
-  .$mergeJSON(process.env.CONFIG_OVERRIDES ?? '{}')
+// Merge from a local JSON file
+const config = base.$mergeJSON(readFileSync('./overrides.json', 'utf8'))
+
+// Or from a config service
+const overrides = await fetch('https://config.example.com/app').then(r => r.text())
+const config = base.$mergeJSON(overrides)
 ```
 
 ### `$freeze()`
