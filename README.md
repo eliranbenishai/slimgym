@@ -280,6 +280,47 @@ config.$freeze()  // All mutations now throw in strict mode
 
 > **Note:** Method names use `$` prefix because `$` isn't valid in SlimGym keys—no collision with your data.
 
+## CLI
+
+SlimGym includes a command-line interface for parsing, formatting, validating, and converting files.
+
+```bash
+# Install globally
+npm install -g slimgym
+
+# Or use via npx
+npx slimgym <command> <file>
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `slimgym parse <file>` | Parse .sg file → output JSON |
+| `slimgym format <file>` | Format/prettify a .sg file |
+| `slimgym validate <file>` | Validate syntax (exit 0/1) |
+| `slimgym convert <file>` | Convert JSON → SlimGym |
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-o, --output <file>` | Write to file instead of stdout |
+| `-i, --indent <n>` | JSON indent spaces (default: 2) |
+| `-q, --quiet` | Suppress output |
+| `-h, --help` | Show help |
+| `-v, --version` | Show version |
+
+### Examples
+
+```bash
+slimgym parse config.sg                    # Output JSON to stdout
+slimgym parse config.sg -o config.json     # Write JSON to file
+slimgym format config.sg -o config.sg      # Format in-place
+slimgym validate config.sg && echo "OK"    # Check syntax
+slimgym convert config.json -o config.sg   # JSON to SlimGym
+```
+
 ## TypeScript
 
 All methods support generics: `sg.parse<Config>(...)`, `sg.file<Config>(...)`, etc.

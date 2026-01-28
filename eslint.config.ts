@@ -109,5 +109,15 @@ export default [
       },
     },
   },
+  // CLI-specific overrides
+  {
+    files: ['cli.ts'],
+    rules: {
+      'no-console': 'off',
+      'func-style': 'off',
+      // Array indexing can return undefined at runtime even if TS type doesn't show it
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+    },
+  },
 ]
 
